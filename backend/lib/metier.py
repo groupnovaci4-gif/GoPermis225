@@ -227,10 +227,11 @@ def alertes_vehicule(vehicule: dict, *, aujourdhui: date | None = None) -> list[
     }
     alertes: list[dict] = []
     for champ, libelle in libelles.items():
-        echeance = vehicule.get(champ)
-        if isinstance(echeance, datetime):
-            echeance = echeance.date()
-        if not isinstance(echeance, date):
+        # `_en_date` accepte aussi bien un `date`, un `datetime` qu'une chaîne
+        # ISO. C'est indispensable : les dates sont PERSISTÉES en chaînes, donc
+        # n'accepter que des objets `date` revient à ne jamais alerter.
+        echeance = _en_date(vehicule.get(champ))
+        if echeance is None:
             continue
         if echeance < jour:
             alertes.append(

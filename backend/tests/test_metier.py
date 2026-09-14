@@ -205,10 +205,25 @@ def test_une_echeance_lointaine_ne_declenche_rien():
 
 
 def test_les_dates_stockees_en_chaine_sont_comprises():
-    """Les dates sont persistées en ISO : l'alerte doit les lire quand même."""
+    """Les échéances sont persistées en chaînes ISO (BSON n'encode pas `date`).
+
+    Si l'alerte n'acceptait que des objets `date`, elle ne se déclencherait
+    jamais en production : le champ relu depuis Mongo est toujours une chaîne.
+    """
     jour = date(2026, 10, 1)
-    alertes = alertes_vehicule({"assuranceExpire": "2026-09-01"}, aujourdhui=jour)
-    assert alertes == []  # une chaîne n'est pas une date : on n'invente rien
+
+    expiree = alertes_vehicule({"assuranceExpire": "2026-09-01"}, aujourdhui=jour)
+    assert len(expiree) == 1
+    assert expiree[0]["niveau"] == "expire"
+    assert expiree[0]["jours"] == -30
+
+    proche = alertes_vehicule({"visiteTechniqueExpire": "2026-10-10"}, aujourdhui=jour)
+    assert proche[0]["niveau"] == "bientot"
+    assert proche[0]["jours"] == 9
+
+    assert alertes_vehicule({"assuranceExpire": "2027-06-01"}, aujourdhui=jour) == []
+    # Une valeur illisible est ignorée, pas devinée.
+    assert alertes_vehicule({"assuranceExpire": "bientot"}, aujourdhui=jour) == []
 
 
 # --- Tableau de bord ------------------------------------------------------

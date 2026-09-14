@@ -67,6 +67,11 @@ async def creer_index(db: Any) -> None:
         unique=True,
         partialFilterExpression={"clientOpId": {"$gt": ""}},
     )
+    await db[PAIEMENTS].create_index(
+        [("ecoleId", 1), ("numeroRecu", 1)],
+        unique=True,
+        partialFilterExpression={"numeroRecu": {"$gt": ""}},
+    )
     await db[SEANCES].create_index([("ecoleId", 1), ("debut", 1)])
     await db[SEANCES].create_index([("ecoleId", 1), ("moniteurId", 1), ("debut", 1)])
     await db[SEANCES].create_index([("ecoleId", 1), ("eleveId", 1)])
