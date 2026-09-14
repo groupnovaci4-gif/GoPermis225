@@ -44,7 +44,14 @@ async def semer() -> None:
     donc toujours quelque chose à montrer, quel que soit le jour où la démo
     est lancée.
     """
-    ecole_id = nouvel_id()
+    # Identifiants FIXES, et non tirés au hasard.
+    #
+    # La base est en mémoire : chaque redémarrage la recrée. Avec des
+    # identifiants aléatoires, le jeton gardé par le navigateur désignait une
+    # auto-école qui n'existait plus — l'application s'affichait connectée mais
+    # entièrement vide, et le serveur avait raison de ne rien montrer. Des
+    # identifiants stables font survivre la session aux redémarrages.
+    ecole_id = "demo0000ecole0000laureussite0001"
     await BASE["ecoles"].insert_one(
         {
             "id": ecole_id, "ecoleId": ecole_id, "nom": "Auto-École La Réussite",
@@ -57,20 +64,24 @@ async def semer() -> None:
         }
     )
 
-    directeur_id = nouvel_id()
+    directeur_id = "demo0000directeur0000koffi000001"
     moniteurs = [
-        {"id": nouvel_id(), "nom": "Yao Kouassi", "telephone": "0708080808",
-         "role": "moniteur", "tarifHoraire": 2500, "permisEnseigner": "MON-CI-4023"},
-        {"id": nouvel_id(), "nom": "Aya Bernadette", "telephone": "0709090909",
-         "role": "moniteur", "tarifHoraire": 2200, "permisEnseigner": "MON-CI-4412"},
-        {"id": nouvel_id(), "nom": "Bamba Seydou", "telephone": "0710101010",
-         "role": "moniteur", "tarifHoraire": 2800, "permisEnseigner": "MON-CI-5178"},
+        {"id": "demo0000moniteur00000yao0000001", "nom": "Yao Kouassi",
+         "telephone": "0708080808", "role": "moniteur", "tarifHoraire": 2500,
+         "permisEnseigner": "MON-CI-4023"},
+        {"id": "demo0000moniteur00000aya0000002", "nom": "Aya Bernadette",
+         "telephone": "0709090909", "role": "moniteur", "tarifHoraire": 2200,
+         "permisEnseigner": "MON-CI-4412"},
+        {"id": "demo0000moniteur00000bamba00003", "nom": "Bamba Seydou",
+         "telephone": "0710101010", "role": "moniteur", "tarifHoraire": 2800,
+         "permisEnseigner": "MON-CI-5178"},
     ]
     for agent in [
         {"id": directeur_id, "nom": "M. Koffi Anzoumana", "telephone": "0701020304",
          "role": "directeur", "tarifHoraire": 0, "permisEnseigner": ""},
-        {"id": nouvel_id(), "nom": "Adjoua Konan", "telephone": "0505050505",
-         "role": "secretaire", "tarifHoraire": 0, "permisEnseigner": ""},
+        {"id": "demo0000secretaire0000adjoua01", "nom": "Adjoua Konan",
+         "telephone": "0505050505", "role": "secretaire", "tarifHoraire": 0,
+         "permisEnseigner": ""},
         *moniteurs,
     ]:
         await BASE["utilisateurs"].insert_one(
@@ -107,7 +118,7 @@ async def semer() -> None:
     for (nom, prenoms, tel, commune, categorie, frais, statut, heures,
          part_reglee, jours_dernier, mois_inscription) in eleves:
         suite_eleve += 1
-        eleve_id = nouvel_id()
+        eleve_id = f"demo0000eleve000000000000000{suite_eleve:04d}"
         identifiants.append((eleve_id, f"{prenoms} {nom}"))
         inscription = date.today() - timedelta(days=30 * mois_inscription)
 

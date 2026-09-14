@@ -69,6 +69,11 @@ Lance l'API sur une base **en mémoire** avec un jeu de données :
 directeur `0701020304` / `demo1234`, moniteur `0708080808` / `demo1234`.
 Les données disparaissent à l'arrêt — pour la démonstration uniquement.
 
+Les identifiants internes du jeu de démonstration sont **fixes**. La base
+étant en mémoire, chaque redémarrage la recrée : avec des identifiants tirés
+au hasard, la session gardée par le navigateur désignait une auto-école qui
+n'existait plus, et l'application s'affichait connectée mais entièrement vide.
+
 Le serveur écoute sur `0.0.0.0:8000` : dans un conteneur, un aperçu
 d'hébergeur se connecte depuis l'extérieur de la boucle locale, et n'écouter
 que sur `127.0.0.1` donne un « connexion refusée » alors que le serveur
