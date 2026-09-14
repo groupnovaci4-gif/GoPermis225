@@ -1,92 +1,108 @@
-/** Parc automobile : fiches, échéances administratives, entretien. */
+/** Flotte automobile : fiches, échéances administratives, entretien. */
 
 import { useState } from "react";
-import { Link } from "react-router-dom";
 
 import { api } from "../api";
-import { Badge, Carte, Champ, Chargement, Feuille, Message, Vide } from "../components/ui";
+import { Atelier } from "../components/Atelier";
+import {
+  Avis, Bloc, Champ, Chargement, Desert, Grille, Jeton, Volet,
+} from "../components/ui";
 import { aujourdhuiISO, fDate, fFCFA } from "../format";
 import { useChargement, useEnvoi } from "../hooks";
 import type { Vehicule } from "../types";
 
-export default function Vehicules() {
-  const [ouvrirCreation, setOuvrirCreation] = useState(false);
+export default function Flotte() {
+  const [creation, setCreation] = useState(false);
   const [fiche, setFiche] = useState<Vehicule | null>(null);
   const { donnees, chargement, erreur, recharger } = useChargement<Vehicule[]>(
     () => api.get<Vehicule[]>("/api/vehicules"), [],
   );
 
   return (
-    <>
-      <header className="entete">
-        <h1>Parc automobile</h1>
-        <button type="button" className="bouton petit" onClick={() => setOuvrirCreation(true)}>
-          + Véhicule
+    <Atelier
+      titre="Flotte automobile"
+      sous={donnees ? `${donnees.length} véhicule(s)` : undefined}
+      outils={
+        <button type="button" className="bouton" onClick={() => setCreation(true)}>
+          Ajouter un véhicule
         </button>
-      </header>
+      }
+    >
+      {chargement && <Chargement lignes={4} />}
+      {erreur && <Avis ton="erreur">{erreur}</Avis>}
 
-      <main className="contenu">
-        {chargement && <Chargement lignes={3} />}
-        {erreur && <Message ton="erreur">{erreur}</Message>}
-        {donnees?.length === 0 && (
-          <Vide icone="🚗">
-            Aucun véhicule enregistré. Ajoutez-en un pour suivre assurance,
-            visite technique et entretien.
-          </Vide>
-        )}
-
-        {donnees && donnees.length > 0 && (
-          <Carte>
-            <div className="liste">
+      {donnees && (
+        <Bloc sansPadding>
+          {donnees.length === 0 ? (
+            <Desert glyphe="◴">
+              Aucun véhicule enregistré. Ajoutez-en un pour suivre assurance,
+              visite technique et entretien.
+            </Desert>
+          ) : (
+            <Grille
+              colonnes={[
+                { cle: "immat", libelle: "Véhicule" },
+                { cle: "km", libelle: "Kilométrage", droite: true },
+                { cle: "assur", libelle: "Assurance" },
+                { cle: "visite", libelle: "Visite technique" },
+                { cle: "etat", libelle: "État", droite: true },
+                { cle: "act", libelle: "Fiche", droite: true },
+              ]}
+            >
               {donnees.map((v) => {
                 const expire = (v.alertes ?? []).filter((a) => a.niveau === "expire").length;
                 const bientot = (v.alertes ?? []).filter((a) => a.niveau === "bientot").length;
                 return (
-                  <button key={v.id} type="button" className="ligne" onClick={() => setFiche(v)}>
-                    <div className="corps">
-                      <div className="principal">{v.immatriculation}</div>
-                      <div className="secondaire">
-                        {v.modele}{v.annee ? ` · ${v.annee}` : ""} ·{" "}
-                        {v.kilometrage.toLocaleString("fr-FR")} km
+                  <tr key={v.id}>
+                    <td>
+                      <div className="nom-primaire mono">{v.immatriculation}</div>
+                      <div className="nom-secondaire">
+                        {v.modele}{v.annee ? ` · ${v.annee}` : ""}
                       </div>
-                    </div>
-                    <div className="droite">
-                      {!v.actif && <Badge ton="rouge">Hors service</Badge>}
-                      {expire > 0 && <Badge ton="rouge">{expire} expiré{expire > 1 ? "s" : ""}</Badge>}
-                      {expire === 0 && bientot > 0 && <Badge ton="orange">{bientot} à renouveler</Badge>}
-                      {expire === 0 && bientot === 0 && v.actif && <Badge ton="vert">À jour</Badge>}
-                    </div>
-                  </button>
+                    </td>
+                    <td className="num droite">{v.kilometrage.toLocaleString("fr-FR")} km</td>
+                    <td className="num">{fDate(v.assuranceExpire)}</td>
+                    <td className="num">{fDate(v.visiteTechniqueExpire)}</td>
+                    <td className="droite">
+                      {!v.actif && <Jeton ton="rouge">Hors service</Jeton>}
+                      {v.actif && expire > 0 && <Jeton ton="rouge">{expire} expiré(s)</Jeton>}
+                      {v.actif && expire === 0 && bientot > 0 && (
+                        <Jeton ton="orange">{bientot} à renouveler</Jeton>
+                      )}
+                      {v.actif && expire === 0 && bientot === 0 && <Jeton ton="vert">À jour</Jeton>}
+                    </td>
+                    <td className="droite">
+                      <button type="button" className="bouton nu" onClick={() => setFiche(v)}>
+                        Ouvrir
+                      </button>
+                    </td>
+                  </tr>
                 );
               })}
-            </div>
-          </Carte>
-        )}
+            </Grille>
+          )}
+        </Bloc>
+      )}
 
-        <p className="centre">
-          <Link to="/" className="doux">← Tableau de bord</Link>
-        </p>
-      </main>
-
-      {ouvrirCreation && (
-        <FeuilleVehicule
-          onFermer={() => setOuvrirCreation(false)}
-          onCree={() => { setOuvrirCreation(false); recharger(); }}
+      {creation && (
+        <VoletVehicule
+          onFermer={() => setCreation(false)}
+          onCree={() => { setCreation(false); recharger(); }}
         />
       )}
 
       {fiche && (
-        <FeuilleFiche
+        <VoletFiche
           vehicule={fiche}
           onFermer={() => setFiche(null)}
           onModifie={() => { setFiche(null); recharger(); }}
         />
       )}
-    </>
+    </Atelier>
   );
 }
 
-function FeuilleVehicule({ onFermer, onCree }: { onFermer: () => void; onCree: () => void }) {
+function VoletVehicule({ onFermer, onCree }: { onFermer: () => void; onCree: () => void }) {
   const { envoi, erreur, executer } = useEnvoi();
   const [immatriculation, setImmatriculation] = useState("");
   const [modele, setModele] = useState("");
@@ -112,7 +128,7 @@ function FeuilleVehicule({ onFermer, onCree }: { onFermer: () => void; onCree: (
   }
 
   return (
-    <Feuille titre="Ajouter un véhicule" onFermer={onFermer}>
+    <Volet titre="Ajouter un véhicule" onFermer={onFermer}>
       <form onSubmit={soumettre}>
         <Champ etiquette="Immatriculation">
           <input
@@ -147,21 +163,21 @@ function FeuilleVehicule({ onFermer, onCree }: { onFermer: () => void; onCree: (
             inputMode="numeric"
           />
         </Champ>
-        <Champ etiquette="Assurance — date d'expiration">
+        <Champ etiquette="Assurance — expire le">
           <input type="date" value={assuranceExpire} onChange={(e) => setAssuranceExpire(e.target.value)} />
         </Champ>
-        <Champ etiquette="Visite technique — date d'expiration">
+        <Champ etiquette="Visite technique — expire le">
           <input
             type="date"
             value={visiteTechniqueExpire}
             onChange={(e) => setVisiteTechniqueExpire(e.target.value)}
           />
         </Champ>
-        <Champ etiquette="Vignette — date d'expiration">
+        <Champ etiquette="Vignette — expire le">
           <input type="date" value={vignetteExpire} onChange={(e) => setVignetteExpire(e.target.value)} />
         </Champ>
 
-        {erreur && <Message ton="erreur">{erreur}</Message>}
+        {erreur && <Avis ton="erreur">{erreur}</Avis>}
 
         <div className="actions" style={{ marginTop: 14 }}>
           <button type="button" className="bouton doux" onClick={onFermer}>Annuler</button>
@@ -170,11 +186,11 @@ function FeuilleVehicule({ onFermer, onCree }: { onFermer: () => void; onCree: (
           </button>
         </div>
       </form>
-    </Feuille>
+    </Volet>
   );
 }
 
-function FeuilleFiche({
+function VoletFiche({
   vehicule, onFermer, onModifie,
 }: { vehicule: Vehicule; onFermer: () => void; onModifie: () => void }) {
   const { envoi, erreur, executer } = useEnvoi();
@@ -184,21 +200,17 @@ function FeuilleFiche({
   const [date, setDate] = useState(aujourdhuiISO());
 
   return (
-    <Feuille titre={vehicule.immatriculation} onFermer={onFermer}>
-      <p className="doux">{vehicule.modele}{vehicule.annee ? ` · ${vehicule.annee}` : ""}</p>
+    <Volet titre={vehicule.immatriculation} onFermer={onFermer}>
+      <p className="faible">{vehicule.modele}{vehicule.annee ? ` · ${vehicule.annee}` : ""}</p>
 
-      {(vehicule.alertes ?? []).length > 0 && (
-        <div style={{ marginBottom: 12 }}>
-          {(vehicule.alertes ?? []).map((a, i) => (
-            <Message key={i} ton={a.niveau === "expire" ? "erreur" : "alerte"}>
-              {a.libelle} : {a.niveau === "expire" ? "expirée" : "expire"} le {fDate(a.echeance)}
-              {a.niveau === "expire" ? ` (il y a ${Math.abs(a.jours)} jours)` : ` (dans ${a.jours} jours)`}
-            </Message>
-          ))}
-        </div>
-      )}
+      {(vehicule.alertes ?? []).map((a, i) => (
+        <Avis key={i} ton={a.niveau === "expire" ? "erreur" : "alerte"}>
+          {a.libelle} : {a.niveau === "expire" ? "expirée" : "expire"} le {fDate(a.echeance)}
+          {a.niveau === "expire" ? ` (il y a ${Math.abs(a.jours)} jours)` : ` (dans ${a.jours} jours)`}
+        </Avis>
+      ))}
 
-      <Carte titre="Ajouter un entretien">
+      <Bloc titre="Ajouter un entretien">
         <Champ etiquette="Nature">
           <input
             value={nature}
@@ -240,27 +252,29 @@ function FeuilleFiche({
         >
           Enregistrer l'entretien
         </button>
-      </Carte>
+      </Bloc>
 
       {(vehicule.entretiens ?? []).length > 0 && (
-        <Carte titre="Journal d'entretien">
-          <div className="liste">
+        <Bloc titre="Journal d'entretien" sansPadding>
+          <Grille
+            colonnes={[
+              { cle: "date", libelle: "Date" },
+              { cle: "nature", libelle: "Nature" },
+              { cle: "cout", libelle: "Coût", droite: true },
+            ]}
+          >
             {(vehicule.entretiens ?? []).slice().reverse().map((e, i) => (
-              <div key={i} className="ligne" style={{ cursor: "default" }}>
-                <div className="corps">
-                  <div className="principal">{e.nature}</div>
-                  <div className="secondaire">
-                    {fDate(e.date)} · {e.kilometrage.toLocaleString("fr-FR")} km
-                  </div>
-                </div>
-                <div className="droite nombre">{fFCFA(e.cout)}</div>
-              </div>
+              <tr key={i}>
+                <td className="num">{fDate(e.date)}</td>
+                <td>{e.nature}</td>
+                <td className="num droite">{fFCFA(e.cout)}</td>
+              </tr>
             ))}
-          </div>
-        </Carte>
+          </Grille>
+        </Bloc>
       )}
 
-      {erreur && <Message ton="erreur">{erreur}</Message>}
+      {erreur && <Avis ton="erreur">{erreur}</Avis>}
 
       <button
         type="button"
@@ -276,6 +290,6 @@ function FeuilleFiche({
       >
         {vehicule.actif ? "Mettre hors service" : "Remettre en service"}
       </button>
-    </Feuille>
+    </Volet>
   );
 }

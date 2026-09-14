@@ -134,6 +134,32 @@ backend/.venv/bin/python scripts/demo.py
 - **Verrou de connexion en mémoire.** Remis à zéro au redémarrage et non
   partagé entre instances : passer sur Redis si l'application est répliquée.
 
+## 5 bis. Présentation
+
+L'interface est un **poste de travail** : barre latérale permanente, tableaux
+denses, chiffres à chasse fixe (`.mono`, `font-variant-numeric: tabular-nums`)
+pour que les colonnes de montants s'alignent à l'œil. Sous 860 px, la barre
+latérale devient une barre d'onglets en bas — un moniteur consulte son planning
+sur le terrain, pas devant un écran.
+
+Trois espaces distincts, à ne pas mélanger :
+
+| Espace | Adresses | Qui |
+|---|---|---|
+| Vitrine publique | `#/` | visiteur non connecté |
+| Espace de gestion | `#/tableau-de-bord`, `#/eleves`… | personnel authentifié |
+| Portail élève | `#/portail`, `#/portail/<jeton>` | élève, lecture seule |
+
+Conventions d'écriture :
+
+- les formulaires s'ouvrent dans un **volet latéral** (`<Volet>`), jamais dans
+  une boîte modale centrée : la liste reste visible derrière ;
+- les listes passent par `<Grille>` ; les cartes de chiffres par
+  `<Indicateur>` ; les blocs par `<Bloc>` ;
+- aucune photographie n'est embarquée. Les visuels sont construits en CSS —
+  une image de banque d'images poserait une question de droits que
+  l'auto-école n'a pas à hériter.
+
 ## 6. Conventions
 
 - **Textes d'interface et commentaires en français.**

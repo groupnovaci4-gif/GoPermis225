@@ -1,46 +1,40 @@
-/** Routage et navigation, par rôle.
+/** Routage.
  *
- * Le filtrage par rôle fait ici est un confort d'affichage. La vraie
- * autorisation est côté serveur : masquer un bouton n'empêche personne
- * d'appeler l'API.
+ * Trois espaces distincts : la vitrine publique, l'espace de gestion
+ * (personnel authentifié) et le portail élève. Un jeton élève n'ouvre que le
+ * portail ; le filtrage par rôle à l'intérieur de l'espace de gestion est un
+ * confort d'affichage, l'autorisation réelle étant côté serveur.
  */
 
-import { NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 import { useSession } from "./session";
+import Comptabilite from "./pages/Comptabilite";
 import Connexion from "./pages/Connexion";
-import TableauBord from "./pages/TableauBord";
-import Eleves from "./pages/Eleves";
 import EleveDetail from "./pages/EleveDetail";
+import Eleves from "./pages/Eleves";
+import Flotte from "./pages/Flotte";
+import Moniteurs from "./pages/Moniteurs";
 import Planning from "./pages/Planning";
-import Finances from "./pages/Finances";
-import Personnel from "./pages/Personnel";
-import Vehicules from "./pages/Vehicules";
-import Reglages from "./pages/Reglages";
 import Portail from "./pages/Portail";
-
-interface Onglet {
-  chemin: string;
-  libelle: string;
-  icone: string;
-}
+import Reglages from "./pages/Reglages";
+import TableauBord from "./pages/TableauBord";
+import Vitrine from "./pages/Vitrine";
 
 export default function App() {
-  const { session, pret, estDirecteur, estMoniteur, peutGerer } = useSession();
+  const { session, pret, estMoniteur } = useSession();
   const emplacement = useLocation();
-
-  // Le portail élève vit sur ses propres adresses, hors de l'espace école.
-  const versPortail = emplacement.pathname.startsWith("/portail");
 
   if (!pret) {
     return (
-      <div className="pleine-page">
-        <p className="doux centre">Chargement…</p>
+      <div style={{ display: "grid", placeItems: "center", minHeight: "100vh" }}>
+        <p className="faible">Chargement…</p>
       </div>
     );
   }
 
-  if (versPortail) {
+  // Le portail élève vit sur ses propres adresses, hors de l'espace de gestion.
+  if (emplacement.pathname.startsWith("/portail")) {
     return (
       <Routes>
         <Route path="/portail" element={<Portail />} />
@@ -49,48 +43,33 @@ export default function App() {
     );
   }
 
-  if (!session) return <Connexion />;
-
-  if (session.cote === "eleve") {
-    // Un jeton élève ne donne accès qu'au portail.
-    return <Navigate to="/portail" replace />;
+  if (!session) {
+    return (
+      <Routes>
+        <Route path="/" element={<Vitrine />} />
+        <Route path="/connexion" element={<Connexion />} />
+        <Route path="*" element={<Navigate to="/connexion" replace />} />
+      </Routes>
+    );
   }
 
-  const onglets: Onglet[] = [
-    { chemin: "/", libelle: estMoniteur ? "Planning" : "Accueil", icone: estMoniteur ? "📅" : "🏠" },
-    { chemin: "/eleves", libelle: "Élèves", icone: "👥" },
-    ...(estMoniteur ? [] : [{ chemin: "/planning", libelle: "Planning", icone: "📅" }]),
-    ...(peutGerer ? [{ chemin: "/finances", libelle: "Caisse", icone: "💰" }] : []),
-    ...(estDirecteur ? [{ chemin: "/reglages", libelle: "Réglages", icone: "⚙️" }] : []),
-  ];
+  if (session.cote === "eleve") return <Navigate to="/portail" replace />;
+
+  const accueil = estMoniteur ? "/planning" : "/tableau-de-bord";
 
   return (
-    <div className="app">
-      <Routes>
-        <Route path="/" element={estMoniteur ? <Planning /> : <TableauBord />} />
-        <Route path="/eleves" element={<Eleves />} />
-        <Route path="/eleves/:id" element={<EleveDetail />} />
-        <Route path="/planning" element={<Planning />} />
-        <Route path="/finances" element={<Finances />} />
-        <Route path="/personnel" element={<Personnel />} />
-        <Route path="/vehicules" element={<Vehicules />} />
-        <Route path="/reglages" element={<Reglages />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-
-      <nav className="barre-nav" aria-label="Navigation principale">
-        {onglets.map((o) => (
-          <NavLink
-            key={o.chemin}
-            to={o.chemin}
-            end={o.chemin === "/"}
-            className={({ isActive }) => (isActive ? "actif" : "")}
-          >
-            <span className="icone" aria-hidden="true">{o.icone}</span>
-            {o.libelle}
-          </NavLink>
-        ))}
-      </nav>
-    </div>
+    <Routes>
+      <Route path="/" element={<Navigate to={accueil} replace />} />
+      <Route path="/connexion" element={<Navigate to={accueil} replace />} />
+      <Route path="/tableau-de-bord" element={estMoniteur ? <Navigate to="/planning" replace /> : <TableauBord />} />
+      <Route path="/eleves" element={<Eleves />} />
+      <Route path="/eleves/:id" element={<EleveDetail />} />
+      <Route path="/comptabilite" element={<Comptabilite />} />
+      <Route path="/planning" element={<Planning />} />
+      <Route path="/flotte" element={<Flotte />} />
+      <Route path="/moniteurs" element={<Moniteurs />} />
+      <Route path="/reglages" element={<Reglages />} />
+      <Route path="*" element={<Navigate to={accueil} replace />} />
+    </Routes>
   );
 }

@@ -1,14 +1,13 @@
-/** Planning : semaine en cours, conflits, clôture des séances. */
+/** Planning hebdomadaire : conflits détectés, clôture des séances. */
 
 import { useMemo, useState } from "react";
 
 import { api } from "../api";
+import { Atelier } from "../components/Atelier";
 import {
-  BadgeStatutSeance, Carte, Champ, Chargement, Feuille, Message, Vide,
+  Avis, Bloc, Champ, Chargement, Desert, Grille, JetonStatutSeance, Volet,
 } from "../components/ui";
-import {
-  LIBELLE_TYPE_SEANCE, fDuree, fHeure,
-} from "../format";
+import { LIBELLE_TYPE_SEANCE, fDuree, fHeure } from "../format";
 import { useChargement, useEnvoi } from "../hooks";
 import { useSession } from "../session";
 import type { Eleve, Seance, StatutSeance, TypeSeance, Utilisateur, Vehicule } from "../types";
@@ -17,40 +16,34 @@ import type { Eleve, Seance, StatutSeance, TypeSeance, Utilisateur, Vehicule } f
 function lundiDe(reference: Date): Date {
   const d = new Date(reference);
   d.setHours(0, 0, 0, 0);
-  // getDay() : 0 = dimanche. On ramène au lundi précédent.
-  const decalage = (d.getDay() + 6) % 7;
-  d.setDate(d.getDate() - decalage);
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); // getDay() : 0 = dimanche
   return d;
 }
 
 const JOURS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"];
 
 export default function Planning() {
-  const { peutGerer, estMoniteur, deconnecter, session } = useSession();
-  const [decalageSemaine, setDecalageSemaine] = useState(0);
-  const [ouvrirCreation, setOuvrirCreation] = useState(false);
+  const { peutGerer, estMoniteur } = useSession();
+  const [semaine, setSemaine] = useState(0);
+  const [creation, setCreation] = useState(false);
   const [aCloturer, setACloturer] = useState<Seance | null>(null);
 
-  const debutSemaine = useMemo(() => {
+  const debut = useMemo(() => {
     const d = lundiDe(new Date());
-    d.setDate(d.getDate() + decalageSemaine * 7);
+    d.setDate(d.getDate() + semaine * 7);
     return d;
-  }, [decalageSemaine]);
+  }, [semaine]);
 
-  const finSemaine = useMemo(() => {
-    const d = new Date(debutSemaine);
+  const fin = useMemo(() => {
+    const d = new Date(debut);
     d.setDate(d.getDate() + 7);
     return d;
-  }, [debutSemaine]);
+  }, [debut]);
 
   const { donnees, chargement, erreur, recharger } = useChargement<Seance[]>(
-    () =>
-      api.get<Seance[]>(
-        `/api/seances?du=${debutSemaine.toISOString()}&au=${finSemaine.toISOString()}`,
-      ),
-    [debutSemaine.getTime()],
+    () => api.get<Seance[]>(`/api/seances?du=${debut.toISOString()}&au=${fin.toISOString()}`),
+    [debut.getTime()],
   );
-
   const { donnees: eleves } = useChargement<Eleve[]>(() => api.get<Eleve[]>("/api/eleves"), []);
   const { donnees: personnel } = useChargement<Utilisateur[]>(
     () => api.get<Utilisateur[]>("/api/personnel"), [],
@@ -60,123 +53,121 @@ export default function Planning() {
     const e = eleves?.find((x) => x.id === id);
     return e ? `${e.prenoms} ${e.nom}` : "Élève";
   };
-  const nomMoniteur = (id: string) => personnel?.find((x) => x.id === id)?.nom ?? "Moniteur";
+  const nomMoniteur = (id: string) => personnel?.find((x) => x.id === id)?.nom ?? "—";
 
   const parJour = useMemo(() => {
     const groupes: Seance[][] = [[], [], [], [], [], [], []];
     for (const s of donnees ?? []) {
-      const index = (new Date(s.debut).getDay() + 6) % 7;
-      groupes[index]?.push(s);
+      groupes[(new Date(s.debut).getDay() + 6) % 7]?.push(s);
     }
-    for (const g of groupes) {
-      g.sort((a, b) => a.debut.localeCompare(b.debut));
-    }
+    for (const g of groupes) g.sort((a, b) => a.debut.localeCompare(b.debut));
     return groupes;
   }, [donnees]);
 
+  const libelleSemaine =
+    semaine === 0
+      ? "Cette semaine"
+      : `Semaine du ${debut.toLocaleDateString("fr-FR", { day: "2-digit", month: "long" })}`;
+
   return (
-    <>
-      <header className="entete">
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <h1>Planning</h1>
-          <div className="sous">{estMoniteur ? session?.utilisateur?.nom : "Toute l'école"}</div>
-        </div>
-        {peutGerer && (
-          <button type="button" className="bouton petit" onClick={() => setOuvrirCreation(true)}>
-            + Séance
+    <Atelier
+      titre="Planning"
+      sous={estMoniteur ? "Vos séances" : "Toutes les séances de l'école"}
+      outils={
+        <>
+          <button type="button" className="bouton doux" onClick={() => setSemaine((s) => s - 1)}>
+            ←
           </button>
-        )}
-        {estMoniteur && (
-          <button type="button" className="bouton doux petit" onClick={deconnecter}>Quitter</button>
-        )}
-      </header>
-
-      <main className="contenu">
-        <div className="rangee espace">
-          <button type="button" className="bouton doux petit" onClick={() => setDecalageSemaine((d) => d - 1)}>
-            ← Précédente
+          <button type="button" className="bouton doux" onClick={() => setSemaine(0)}>
+            Aujourd'hui
           </button>
-          <strong style={{ fontSize: 13 }}>
-            {decalageSemaine === 0
-              ? "Cette semaine"
-              : debutSemaine.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}
-          </strong>
-          <button type="button" className="bouton doux petit" onClick={() => setDecalageSemaine((d) => d + 1)}>
-            Suivante →
+          <button type="button" className="bouton doux" onClick={() => setSemaine((s) => s + 1)}>
+            →
           </button>
-        </div>
+          {peutGerer && (
+            <button type="button" className="bouton" onClick={() => setCreation(true)}>
+              Nouvelle séance
+            </button>
+          )}
+        </>
+      }
+    >
+      <div className="sur-titre">{libelleSemaine}</div>
 
-        {chargement && <Chargement lignes={4} />}
-        {erreur && <Message ton="erreur">{erreur}</Message>}
+      {chargement && <Chargement lignes={5} />}
+      {erreur && <Avis ton="erreur">{erreur}</Avis>}
 
-        {donnees && donnees.length === 0 && (
-          <Vide icone="📅">Aucune séance cette semaine.</Vide>
-        )}
+      {donnees && donnees.length === 0 && (
+        <Bloc><Desert glyphe="◰">Aucune séance planifiée cette semaine.</Desert></Bloc>
+      )}
 
-        {donnees && donnees.length > 0 &&
-          JOURS.map((jour, index) => {
-            const seances = parJour[index] ?? [];
-            if (seances.length === 0) return null;
-            const dateJour = new Date(debutSemaine);
-            dateJour.setDate(dateJour.getDate() + index);
-            return (
-              <Carte
-                key={jour}
-                titre={`${jour} ${dateJour.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" })}`}
+      {donnees && donnees.length > 0 &&
+        JOURS.map((jour, index) => {
+          const seances = parJour[index] ?? [];
+          if (seances.length === 0) return null;
+          const dateJour = new Date(debut);
+          dateJour.setDate(dateJour.getDate() + index);
+          return (
+            <Bloc
+              key={jour}
+              titre={`${jour} ${dateJour.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" })}`}
+              sansPadding
+            >
+              <Grille
+                colonnes={[
+                  { cle: "h", libelle: "Heure" },
+                  { cle: "eleve", libelle: "Élève" },
+                  { cle: "type", libelle: "Type" },
+                  ...(estMoniteur ? [] : [{ cle: "mon", libelle: "Moniteur" }]),
+                  { cle: "lieu", libelle: "Lieu" },
+                  { cle: "statut", libelle: "Statut", droite: true },
+                  { cle: "act", libelle: "", droite: true },
+                ]}
               >
-                <div className="liste">
-                  {seances.map((s) => (
-                    <button
-                      key={s.id}
-                      type="button"
-                      className="ligne"
-                      onClick={() => setACloturer(s)}
-                    >
-                      <div className="corps">
-                        <div className="principal">
-                          {fHeure(s.debut)} — {nomEleve(s.eleveId)}
-                        </div>
-                        <div className="secondaire">
-                          {LIBELLE_TYPE_SEANCE[s.type]} · {fDuree(s.debut, s.fin)}
-                          {!estMoniteur && ` · ${nomMoniteur(s.moniteurId)}`}
-                        </div>
-                      </div>
-                      <div className="droite"><BadgeStatutSeance statut={s.statut} /></div>
-                    </button>
-                  ))}
-                </div>
-              </Carte>
-            );
-          })}
-      </main>
+                {seances.map((s) => (
+                  <tr key={s.id}>
+                    <td className="num">{fHeure(s.debut)}</td>
+                    <td className="nom-primaire">{nomEleve(s.eleveId)}</td>
+                    <td>{LIBELLE_TYPE_SEANCE[s.type]} · {fDuree(s.debut, s.fin)}</td>
+                    {!estMoniteur && <td>{nomMoniteur(s.moniteurId)}</td>}
+                    <td className="faible">{s.lieu || "—"}</td>
+                    <td className="droite"><JetonStatutSeance statut={s.statut} /></td>
+                    <td className="droite">
+                      <button type="button" className="bouton nu" onClick={() => setACloturer(s)}>
+                        Clôturer
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </Grille>
+            </Bloc>
+          );
+        })}
 
-      {ouvrirCreation && (
-        <FeuilleCreation
+      {creation && (
+        <VoletCreation
           eleves={eleves ?? []}
           moniteurs={(personnel ?? []).filter((p) => p.role === "moniteur" && p.actif)}
-          onFermer={() => setOuvrirCreation(false)}
-          onCree={() => { setOuvrirCreation(false); recharger(); }}
+          onFermer={() => setCreation(false)}
+          onCree={() => { setCreation(false); recharger(); }}
         />
       )}
 
       {aCloturer && (
-        <FeuilleCloture
+        <VoletCloture
           seance={aCloturer}
           nomEleve={nomEleve(aCloturer.eleveId)}
           onFermer={() => setACloturer(null)}
           onEnregistre={() => { setACloturer(null); recharger(); }}
         />
       )}
-    </>
+    </Atelier>
   );
 }
 
-function FeuilleCreation({
+function VoletCreation({
   eleves, moniteurs, onFermer, onCree,
-}: {
-  eleves: Eleve[]; moniteurs: Utilisateur[];
-  onFermer: () => void; onCree: () => void;
-}) {
+}: { eleves: Eleve[]; moniteurs: Utilisateur[]; onFermer: () => void; onCree: () => void }) {
   const { envoi, erreur, setErreur, executer } = useEnvoi();
   const { donnees: vehicules } = useChargement<Vehicule[]>(
     () => api.get<Vehicule[]>("/api/vehicules"), [],
@@ -190,15 +181,17 @@ function FeuilleCreation({
   const [heure, setHeure] = useState("08:00");
   const [duree, setDuree] = useState("60");
   const [lieu, setLieu] = useState("");
-  const [conflitDetecte, setConflitDetecte] = useState(false);
+  const [conflit, setConflit] = useState(false);
 
-  async function envoyer(forcer: boolean) {
-    const debut = new Date(`${jour}T${heure}:00`);
-    const fin = new Date(debut.getTime() + Number(duree) * 60000);
+  function creneau() {
+    const d = new Date(`${jour}T${heure}:00`);
+    return { debut: d.toISOString(), fin: new Date(d.getTime() + Number(duree) * 60000).toISOString() };
+  }
+
+  async function envoyerForce() {
     const ok = await executer(async () => {
-      await api.post(`/api/seances${forcer ? "?forcer=true" : ""}`, {
-        eleveId, moniteurId, vehiculeId, type,
-        debut: debut.toISOString(), fin: fin.toISOString(), lieu,
+      await api.post("/api/seances?forcer=true", {
+        eleveId, moniteurId, vehiculeId, type, lieu, ...creneau(),
       });
     });
     if (ok) onCree();
@@ -206,30 +199,21 @@ function FeuilleCreation({
 
   async function soumettre(e: React.FormEvent) {
     e.preventDefault();
-    setConflitDetecte(false);
-    const debut = new Date(`${jour}T${heure}:00`);
-    const fin = new Date(debut.getTime() + Number(duree) * 60000);
+    setConflit(false);
     try {
-      await api.post("/api/seances", {
-        eleveId, moniteurId, vehiculeId, type,
-        debut: debut.toISOString(), fin: fin.toISOString(), lieu,
-      });
+      await api.post("/api/seances", { eleveId, moniteurId, vehiculeId, type, lieu, ...creneau() });
       onCree();
-    } catch (e: unknown) {
-      const erreurApi = e as { statut?: number; message?: string };
-      if (erreurApi.statut === 409) {
-        // Conflit : on propose de forcer plutôt que de bloquer sèchement.
-        // Le secrétariat connaît parfois des arrangements que l'app ignore.
-        setConflitDetecte(true);
-        setErreur(erreurApi.message ?? "Ce créneau est déjà occupé.");
-      } else {
-        setErreur(erreurApi.message ?? "La création a échoué.");
-      }
+    } catch (err: unknown) {
+      const erreurApi = err as { statut?: number; message?: string };
+      // Un conflit est un avertissement, pas un mur : le secrétariat connaît
+      // parfois des arrangements que l'application ignore.
+      if (erreurApi.statut === 409) setConflit(true);
+      setErreur(erreurApi.message ?? "La création a échoué.");
     }
   }
 
   return (
-    <Feuille titre="Nouvelle séance" onFermer={onFermer}>
+    <Volet titre="Nouvelle séance" onFermer={onFermer}>
       <form onSubmit={soumettre}>
         <Champ etiquette="Élève">
           <select value={eleveId} onChange={(e) => setEleveId(e.target.value)} required>
@@ -279,17 +263,12 @@ function FeuilleCreation({
           <input value={lieu} onChange={(e) => setLieu(e.target.value)} maxLength={160} />
         </Champ>
 
-        {erreur && <Message ton={conflitDetecte ? "alerte" : "erreur"}>{erreur}</Message>}
+        {erreur && <Avis ton={conflit ? "alerte" : "erreur"}>{erreur}</Avis>}
 
         <div className="actions" style={{ marginTop: 14 }}>
           <button type="button" className="bouton doux" onClick={onFermer}>Annuler</button>
-          {conflitDetecte ? (
-            <button
-              type="button"
-              className="bouton danger"
-              disabled={envoi}
-              onClick={() => envoyer(true)}
-            >
+          {conflit ? (
+            <button type="button" className="bouton danger" disabled={envoi} onClick={envoyerForce}>
               Créer quand même
             </button>
           ) : (
@@ -299,16 +278,13 @@ function FeuilleCreation({
           )}
         </div>
       </form>
-    </Feuille>
+    </Volet>
   );
 }
 
-function FeuilleCloture({
+function VoletCloture({
   seance, nomEleve, onFermer, onEnregistre,
-}: {
-  seance: Seance; nomEleve: string;
-  onFermer: () => void; onEnregistre: () => void;
-}) {
+}: { seance: Seance; nomEleve: string; onFermer: () => void; onEnregistre: () => void }) {
   const { envoi, erreur, executer } = useEnvoi();
   const [statut, setStatut] = useState<StatutSeance>(seance.statut);
   const [motif, setMotif] = useState(seance.motif ?? "");
@@ -329,8 +305,8 @@ function FeuilleCloture({
   }
 
   return (
-    <Feuille titre="Clôturer la séance" onFermer={onFermer}>
-      <p className="doux">
+    <Volet titre="Clôturer la séance" onFermer={onFermer}>
+      <p className="faible">
         {nomEleve} — {LIBELLE_TYPE_SEANCE[seance.type]}, {fDuree(seance.debut, seance.fin)}
       </p>
       <form onSubmit={soumettre}>
@@ -357,7 +333,7 @@ function FeuilleCloture({
           </Champ>
         )}
 
-        {erreur && <Message ton="erreur">{erreur}</Message>}
+        {erreur && <Avis ton="erreur">{erreur}</Avis>}
 
         <div className="actions" style={{ marginTop: 14 }}>
           <button type="button" className="bouton doux" onClick={onFermer}>Fermer</button>
@@ -366,6 +342,6 @@ function FeuilleCloture({
           </button>
         </div>
       </form>
-    </Feuille>
+    </Volet>
   );
 }

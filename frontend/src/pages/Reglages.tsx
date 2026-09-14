@@ -1,23 +1,21 @@
 /** Réglages de l'auto-école et journal d'audit. Réservé au directeur. */
 
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 
 import { api } from "../api";
-import { Carte, Champ, Chargement, Message } from "../components/ui";
-import { LIBELLE_CATEGORIE, fDateHeure, fFCFA } from "../format";
+import { Atelier } from "../components/Atelier";
+import { Avis, Bloc, Champ, Chargement, Grille } from "../components/ui";
+import { LIBELLE_CATEGORIE, fDateHeure } from "../format";
 import { useChargement, useEnvoi } from "../hooks";
-import { useSession } from "../session";
 import type { Categorie, Ecole, EntreeJournal } from "../types";
 
 export default function Reglages() {
-  const { deconnecter } = useSession();
   const { envoi, erreur, executer } = useEnvoi();
   const [succes, setSucces] = useState(false);
 
   const ecole = useChargement<Ecole>(() => api.get<Ecole>("/api/ecole"), []);
   const journal = useChargement<EntreeJournal[]>(
-    () => api.get<EntreeJournal[]>("/api/ecole/journal?limite=50"), [],
+    () => api.get<EntreeJournal[]>("/api/ecole/journal?limite=60"), [],
   );
 
   const [nom, setNom] = useState("");
@@ -40,9 +38,7 @@ export default function Reglages() {
     setHeuresCode(String(e.heuresCodeParDefaut ?? 20));
     setHeuresConduite(String(e.heuresConduiteParDefaut ?? 20));
     const t: Record<string, string> = {};
-    for (const [cle, valeur] of Object.entries(e.tarifParCategorie ?? {})) {
-      t[cle] = String(valeur);
-    }
+    for (const [cle, valeur] of Object.entries(e.tarifParCategorie ?? {})) t[cle] = String(valeur);
     setTarifs(t);
   }, [ecole.donnees]);
 
@@ -61,26 +57,18 @@ export default function Reglages() {
         heuresConduiteParDefaut: Number(heuresConduite) || 0,
       });
     });
-    if (ok) {
-      setSucces(true);
-      ecole.recharger();
-    }
+    if (ok) { setSucces(true); ecole.recharger(); }
   }
 
   return (
-    <>
-      <header className="entete">
-        <h1>Réglages</h1>
-        <button type="button" className="bouton doux petit" onClick={deconnecter}>Quitter</button>
-      </header>
+    <Atelier titre="Réglages" sous="Identité, tarifs et journal des actions">
+      {ecole.chargement && <Chargement lignes={5} />}
+      {ecole.erreur && <Avis ton="erreur">{ecole.erreur}</Avis>}
 
-      <main className="contenu">
-        {ecole.chargement && <Chargement lignes={4} />}
-        {ecole.erreur && <Message ton="erreur">{ecole.erreur}</Message>}
-
-        {ecole.donnees && (
-          <form onSubmit={enregistrer}>
-            <Carte titre="Identité de l'auto-école">
+      {ecole.donnees && (
+        <form onSubmit={enregistrer}>
+          <div className="rangs-2">
+            <Bloc titre="Identité de l'auto-école">
               <Champ etiquette="Nom">
                 <input value={nom} onChange={(e) => setNom(e.target.value)} required maxLength={120} />
               </Champ>
@@ -101,86 +89,83 @@ export default function Reglages() {
               <Champ etiquette="Numéro d'agrément">
                 <input value={agrement} onChange={(e) => setAgrement(e.target.value)} maxLength={60} />
               </Champ>
-            </Carte>
+            </Bloc>
 
-            <Carte titre="Tarifs par catégorie">
-              <p className="faible" style={{ marginBottom: 10 }}>
-                Repris automatiquement à l'inscription. Modifier un tarif
-                n'affecte pas les élèves déjà inscrits : leur montant est figé
-                au jour de leur inscription.
-              </p>
-              {(Object.keys(LIBELLE_CATEGORIE) as Categorie[]).map((c) => (
-                <Champ key={c} etiquette={LIBELLE_CATEGORIE[c]}>
+            <div style={{ display: "grid", gap: 12, alignContent: "start" }}>
+              <Bloc titre="Tarifs par catégorie">
+                <p className="faible" style={{ marginBottom: 10 }}>
+                  Repris automatiquement à l'inscription. Modifier un tarif
+                  n'affecte pas les élèves déjà inscrits : leur montant est figé
+                  au jour de leur inscription.
+                </p>
+                {(Object.keys(LIBELLE_CATEGORIE) as Categorie[]).map((c) => (
+                  <Champ key={c} etiquette={LIBELLE_CATEGORIE[c]}>
+                    <input
+                      value={tarifs[c] ?? ""}
+                      onChange={(e) =>
+                        setTarifs((t) => ({ ...t, [c]: e.target.value.replace(/\D/g, "") }))
+                      }
+                      inputMode="numeric"
+                      placeholder="150000"
+                    />
+                  </Champ>
+                ))}
+              </Bloc>
+
+              <Bloc titre="Volumes horaires par défaut">
+                <Champ etiquette="Heures de code">
                   <input
-                    value={tarifs[c] ?? ""}
-                    onChange={(e) =>
-                      setTarifs((t) => ({ ...t, [c]: e.target.value.replace(/\D/g, "") }))
-                    }
+                    value={heuresCode}
+                    onChange={(e) => setHeuresCode(e.target.value.replace(/\D/g, ""))}
                     inputMode="numeric"
-                    placeholder="150000"
                   />
                 </Champ>
-              ))}
-            </Carte>
-
-            <Carte titre="Volumes horaires par défaut">
-              <Champ etiquette="Heures de code">
-                <input
-                  value={heuresCode}
-                  onChange={(e) => setHeuresCode(e.target.value.replace(/\D/g, ""))}
-                  inputMode="numeric"
-                />
-              </Champ>
-              <Champ etiquette="Heures de conduite">
-                <input
-                  value={heuresConduite}
-                  onChange={(e) => setHeuresConduite(e.target.value.replace(/\D/g, ""))}
-                  inputMode="numeric"
-                />
-              </Champ>
-            </Carte>
-
-            {erreur && <Message ton="erreur">{erreur}</Message>}
-            {succes && <Message ton="succes">Réglages enregistrés.</Message>}
-
-            <button type="submit" className="bouton large" disabled={envoi} style={{ marginTop: 12 }}>
-              {envoi ? "Enregistrement…" : "Enregistrer les réglages"}
-            </button>
-          </form>
-        )}
-
-        <Carte titre="Raccourcis">
-          <div className="actions">
-            <Link to="/personnel" className="bouton doux">Personnel</Link>
-            <Link to="/vehicules" className="bouton doux">Parc auto</Link>
+                <Champ etiquette="Heures de conduite">
+                  <input
+                    value={heuresConduite}
+                    onChange={(e) => setHeuresConduite(e.target.value.replace(/\D/g, ""))}
+                    inputMode="numeric"
+                  />
+                </Champ>
+              </Bloc>
+            </div>
           </div>
-        </Carte>
 
-        <Carte titre="Journal des actions">
-          <p className="faible" style={{ marginBottom: 10 }}>
-            L'auteur et l'horodatage sont posés par le serveur : ce journal ne
-            peut pas être falsifié depuis un téléphone.
-          </p>
-          {journal.chargement && <Chargement lignes={3} />}
-          <div className="liste">
-            {(journal.donnees ?? []).map((e) => (
-              <div key={e.id} className="ligne" style={{ cursor: "default" }}>
-                <div className="corps">
-                  <div className="principal">{e.action}</div>
-                  <div className="secondaire">
-                    {e.acteurNom || "—"} · {fDateHeure(e.creeLe)}
-                  </div>
-                  {e.details && <div className="faible">{e.details}</div>}
-                </div>
-              </div>
-            ))}
-          </div>
-        </Carte>
+          {erreur && <Avis ton="erreur">{erreur}</Avis>}
+          {succes && <Avis ton="succes">Réglages enregistrés.</Avis>}
 
-        <p className="centre faible">
-          Go Permis 225 — version 1.0 · Montants en {fFCFA(0).replace("0", "").trim()}
+          <button type="submit" className="bouton" disabled={envoi} style={{ marginTop: 12 }}>
+            {envoi ? "Enregistrement…" : "Enregistrer les réglages"}
+          </button>
+        </form>
+      )}
+
+      <Bloc titre="Journal des actions" sansPadding>
+        <p className="faible" style={{ padding: "0 14px 10px" }}>
+          L'auteur et l'horodatage sont posés par le serveur : ce journal ne peut
+          pas être falsifié depuis un téléphone.
         </p>
-      </main>
-    </>
+        {journal.chargement && <div style={{ padding: 14 }}><Chargement lignes={3} /></div>}
+        {!!journal.donnees?.length && (
+          <Grille
+            colonnes={[
+              { cle: "quand", libelle: "Date" },
+              { cle: "qui", libelle: "Auteur" },
+              { cle: "quoi", libelle: "Action" },
+              { cle: "detail", libelle: "Détail" },
+            ]}
+          >
+            {journal.donnees.map((e) => (
+              <tr key={e.id}>
+                <td className="num">{fDateHeure(e.creeLe)}</td>
+                <td>{e.acteurNom || "—"}</td>
+                <td className="mono">{e.action}</td>
+                <td className="faible">{e.details || "—"}</td>
+              </tr>
+            ))}
+          </Grille>
+        )}
+      </Bloc>
+    </Atelier>
   );
 }

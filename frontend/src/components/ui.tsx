@@ -3,53 +3,54 @@
 import type { ReactNode } from "react";
 import { useEffect } from "react";
 
-import type { StatutEleve, StatutSeance } from "../types";
 import { LIBELLE_STATUT_ELEVE, LIBELLE_STATUT_SEANCE } from "../format";
+import type { StatutEleve, StatutSeance } from "../types";
 
-export function Carte({
-  titre, action, children,
-}: { titre?: string; action?: ReactNode; children: ReactNode }) {
+type Ton = "vert" | "orange" | "rouge" | "bleu" | undefined;
+
+export function Bloc({
+  titre, action, children, sansPadding,
+}: { titre?: string; action?: ReactNode; children: ReactNode; sansPadding?: boolean }) {
   return (
-    <section className="carte">
-      {titre && (
-        <div className="carte-titre">
-          <span>{titre}</span>
+    <section className="bloc">
+      {(titre || action) && (
+        <div className="bloc-tete">
+          {titre && <span className="sur-titre">{titre}</span>}
           {action && <span className="action">{action}</span>}
         </div>
       )}
-      {children}
+      <div className={sansPadding ? "" : "bloc-corps"}>{children}</div>
     </section>
   );
 }
 
-export function Tuile({
-  libelle, valeur, detail, ton,
-}: { libelle: string; valeur: ReactNode; detail?: string; ton?: "vert" | "orange" | "rouge" }) {
+export function Indicateur({
+  libelle, valeur, note, glyphe, ton,
+}: { libelle: string; valeur: ReactNode; note?: string; glyphe?: string; ton?: "vert" | "orange" | "rouge" }) {
   return (
-    <div className={`tuile${ton ? ` ${ton}` : ""}`}>
-      <div className="libelle">{libelle}</div>
+    <div className={`indicateur${ton ? ` ${ton}` : ""}`}>
+      {glyphe && <span className="glyphe" aria-hidden="true">{glyphe}</span>}
+      <div className="sur-titre">{libelle}</div>
       <div className="valeur">{valeur}</div>
-      {detail && <div className="detail">{detail}</div>}
+      {note && <div className="note">{note}</div>}
     </div>
   );
 }
 
-export function Badge({ children, ton }: { children: ReactNode; ton?: Ton }) {
-  return <span className={`badge${ton ? ` ${ton}` : ""}`}>{children}</span>;
+export function Jeton({ children, ton }: { children: ReactNode; ton?: Ton }) {
+  return <span className={`jeton${ton ? ` ${ton}` : ""}`}>{children}</span>;
 }
-
-type Ton = "vert" | "orange" | "rouge" | "bleu" | undefined;
 
 const TON_STATUT_ELEVE: Record<StatutEleve, Ton> = {
   actif: "vert",
   suspendu: "orange",
-  diplome: "bleu",   // un diplômé n'est plus « en cours » : bleu, pas vert
+  diplome: "bleu",   // un permis obtenu n'est plus « en cours » : bleu, pas vert
   abandon: "rouge",
   recale: "rouge",
 };
 
-export function BadgeStatutEleve({ statut }: { statut: StatutEleve }) {
-  return <Badge ton={TON_STATUT_ELEVE[statut]}>{LIBELLE_STATUT_ELEVE[statut]}</Badge>;
+export function JetonStatutEleve({ statut }: { statut: StatutEleve }) {
+  return <Jeton ton={TON_STATUT_ELEVE[statut]}>{LIBELLE_STATUT_ELEVE[statut]}</Jeton>;
 }
 
 const TON_STATUT_SEANCE: Record<StatutSeance, Ton> = {
@@ -59,15 +60,15 @@ const TON_STATUT_SEANCE: Record<StatutSeance, Ton> = {
   absent: "rouge",
 };
 
-export function BadgeStatutSeance({ statut }: { statut: StatutSeance }) {
-  return <Badge ton={TON_STATUT_SEANCE[statut]}>{LIBELLE_STATUT_SEANCE[statut]}</Badge>;
+export function JetonStatutSeance({ statut }: { statut: StatutSeance }) {
+  return <Jeton ton={TON_STATUT_SEANCE[statut]}>{LIBELLE_STATUT_SEANCE[statut]}</Jeton>;
 }
 
-export function Jauge({ pourcentage, ton }: { pourcentage: number; ton?: "orange" }) {
+export function Barre({ pourcentage, ton }: { pourcentage: number; ton?: "orange" }) {
   const valeur = Math.max(0, Math.min(100, Math.round(pourcentage)));
   return (
     <div
-      className={`jauge${ton ? ` ${ton}` : ""}`}
+      className={`barre${ton ? ` ${ton}` : ""}`}
       role="progressbar"
       aria-valuenow={valeur}
       aria-valuemin={0}
@@ -95,43 +96,40 @@ export function Champ({
   );
 }
 
-export function Message({
+export function Avis({
   ton = "info", children,
 }: { ton?: "erreur" | "succes" | "info" | "alerte"; children: ReactNode }) {
   return (
-    <div className={`message ${ton}`} role={ton === "erreur" ? "alert" : "status"}>
+    <div className={`avis ${ton}`} role={ton === "erreur" ? "alert" : "status"}>
       {children}
     </div>
   );
 }
 
-export function Vide({ icone = "📭", children }: { icone?: string; children: ReactNode }) {
+export function Desert({ glyphe = "—", children }: { glyphe?: string; children: ReactNode }) {
   return (
-    <div className="vide">
-      <span className="icone" aria-hidden="true">{icone}</span>
+    <div className="desert">
+      <span className="glyphe" aria-hidden="true">{glyphe}</span>
       {children}
     </div>
   );
 }
 
-export function Chargement({ lignes = 3 }: { lignes?: number }) {
+export function Chargement({ lignes = 4 }: { lignes?: number }) {
   return (
-    <div className="liste" aria-busy="true" aria-label="Chargement en cours">
-      {Array.from({ length: lignes }, (_, i) => (
-        <div key={i} className="squelette" style={{ marginBottom: 8 }} />
-      ))}
+    <div aria-busy="true" aria-label="Chargement en cours">
+      {Array.from({ length: lignes }, (_, i) => <div key={i} className="fantome" />)}
     </div>
   );
 }
 
-export function Feuille({
+/** Panneau latéral pour les formulaires — il laisse la liste visible derrière. */
+export function Volet({
   titre, onFermer, children,
 }: { titre: string; onFermer: () => void; children: ReactNode }) {
-  // Échap ferme la feuille : au clavier, chercher la croix est pénible.
+  // Échap ferme le volet : au clavier, viser la croix est pénible.
   useEffect(() => {
-    const surTouche = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onFermer();
-    };
+    const surTouche = (e: KeyboardEvent) => { if (e.key === "Escape") onFermer(); };
     document.addEventListener("keydown", surTouche);
     return () => document.removeEventListener("keydown", surTouche);
   }, [onFermer]);
@@ -139,19 +137,35 @@ export function Feuille({
   return (
     <div
       className="voile"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onFermer();
-      }}
+      onClick={(e) => { if (e.target === e.currentTarget) onFermer(); }}
     >
-      <div className="feuille" role="dialog" aria-modal="true" aria-label={titre}>
-        <div className="feuille-entete">
+      <div className="volet" role="dialog" aria-modal="true" aria-label={titre}>
+        <div className="volet-tete">
           <h2>{titre}</h2>
-          <button type="button" className="fermer" onClick={onFermer} aria-label="Fermer">
-            ×
-          </button>
+          <button type="button" className="fermer" onClick={onFermer} aria-label="Fermer">×</button>
         </div>
         {children}
       </div>
+    </div>
+  );
+}
+
+/** Tableau dense. `colonnes` porte les en-têtes ; `droite` aligne à droite. */
+export function Grille({
+  colonnes, children,
+}: { colonnes: { cle: string; libelle: string; droite?: boolean }[]; children: ReactNode }) {
+  return (
+    <div className="table-enveloppe">
+      <table className="grille">
+        <thead>
+          <tr>
+            {colonnes.map((c) => (
+              <th key={c.cle} className={c.droite ? "droite" : undefined}>{c.libelle}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>{children}</tbody>
+      </table>
     </div>
   );
 }

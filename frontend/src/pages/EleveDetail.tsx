@@ -1,12 +1,13 @@
-/** Dossier complet d'un élève : solde, progression, paiements, séances. */
+/** Dossier d'un élève : progression, situation financière, paiements, séances. */
 
 import { useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 
 import { api, nouvelOpId } from "../api";
+import { Atelier } from "../components/Atelier";
 import {
-  BadgeStatutEleve, BadgeStatutSeance, Carte, Champ, Chargement, Feuille,
-  Initiales, Jauge, Message, Vide,
+  Avis, Barre, Bloc, Champ, Chargement, Desert, Grille, Initiales,
+  JetonStatutEleve, JetonStatutSeance, Volet,
 } from "../components/ui";
 import {
   LIBELLE_MOYEN, LIBELLE_RESULTAT, LIBELLE_STATUT_ELEVE, LIBELLE_TYPE_SEANCE,
@@ -30,267 +31,289 @@ export default function EleveDetail() {
   const { id = "" } = useParams();
   const navigate = useNavigate();
   const { peutGerer, estDirecteur } = useSession();
-  const [feuille, setFeuille] = useState<"paiement" | "statut" | "lien" | null>(null);
+  const [volet, setVolet] = useState<"paiement" | "statut" | "lien" | null>(null);
   const [lienGenere, setLienGenere] = useState<string | null>(null);
+  const [onglet, setOnglet] = useState<"paiements" | "seances">("paiements");
 
   const { donnees, chargement, erreur, recharger } = useChargement<Dossier>(
     () => api.get<Dossier>(`/api/eleves/${id}`),
     [id],
   );
 
+  const e = donnees?.eleve;
+
   return (
-    <>
-      <header className="entete">
-        <button type="button" className="bouton doux petit" onClick={() => navigate(-1)}>
-          ← Retour
-        </button>
-        <h1 style={{ fontSize: 15 }}>Dossier élève</h1>
-      </header>
+    <Atelier
+      titre={e ? `${e.prenoms} ${e.nom}` : "Dossier élève"}
+      sous={e ? `${e.matricule}${e.cni ? ` · CNI ${e.cni}` : ""}${e.commune ? ` · ${e.commune}` : ""}` : undefined}
+      outils={
+        <>
+          <button type="button" className="bouton doux" onClick={() => navigate("/eleves")}>
+            Retour
+          </button>
+          {peutGerer && (
+            <button type="button" className="bouton" onClick={() => setVolet("paiement")}>
+              Encaisser
+            </button>
+          )}
+        </>
+      }
+    >
+      {chargement && <Chargement lignes={5} />}
+      {erreur && <Avis ton="erreur">{erreur}</Avis>}
 
-      <main className="contenu">
-        {chargement && <Chargement lignes={4} />}
-        {erreur && <Message ton="erreur">{erreur}</Message>}
-
-        {donnees && (
-          <>
-            <Carte>
-              <div className="rangee" style={{ alignItems: "flex-start" }}>
-                <Initiales nom={donnees.eleve.nom} prenoms={donnees.eleve.prenoms} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <h2>{donnees.eleve.prenoms} {donnees.eleve.nom}</h2>
-                  <div className="doux">
-                    {donnees.eleve.matricule} · Permis {donnees.eleve.categorie}
-                  </div>
-                  <div style={{ marginTop: 6 }}>
-                    <BadgeStatutEleve statut={donnees.eleve.statut} />
-                  </div>
+      {donnees && e && (
+        <>
+          <div className="rangs-2">
+            <Bloc titre="Dossier">
+              <div className="ligne-flex" style={{ gap: 11, marginBottom: 12 }}>
+                <Initiales nom={e.nom} prenoms={e.prenoms} />
+                <div>
+                  <div style={{ fontWeight: 650 }}>{e.prenoms} {e.nom}</div>
+                  <div className="mono faible">{e.telephone}</div>
                 </div>
+                <span style={{ marginLeft: "auto" }}><JetonStatutEleve statut={e.statut} /></span>
               </div>
 
-              <div className="rangee" style={{ marginTop: 12, gap: 8, flexWrap: "wrap" }}>
+              <DetailLigne libelle="Catégorie" valeur={`Permis ${e.categorie}`} />
+              <DetailLigne libelle="Inscrit le" valeur={fDate(e.dateInscription)} />
+              <DetailLigne libelle="Examen code" valeur={LIBELLE_RESULTAT[e.resultatCode]} />
+              <DetailLigne libelle="Examen conduite" valeur={LIBELLE_RESULTAT[e.resultatConduite]} />
+              {e.telephoneTuteur && <DetailLigne libelle="Tuteur" valeur={e.telephoneTuteur} />}
+
+              <div className="ligne-flex" style={{ gap: 7, marginTop: 14, flexWrap: "wrap" }}>
+                <a className="bouton doux" href={`tel:${e.telephone}`}>Appeler</a>
                 <a
-                  className="bouton doux petit"
-                  href={`tel:${donnees.eleve.telephone}`}
-                >
-                  📞 {donnees.eleve.telephone}
-                </a>
-                <a
-                  className="bouton doux petit"
-                  href={lienWhatsApp(donnees.eleve.telephone, `Bonjour ${donnees.eleve.prenoms},`)}
+                  className="bouton doux"
+                  href={lienWhatsApp(e.telephone, `Bonjour ${e.prenoms},`)}
                   target="_blank"
                   rel="noreferrer"
                 >
                   WhatsApp
                 </a>
                 {peutGerer && (
-                  <button
-                    type="button"
-                    className="bouton doux petit"
-                    onClick={() => setFeuille("lien")}
-                  >
-                    Lien de suivi
-                  </button>
+                  <>
+                    <button type="button" className="bouton doux" onClick={() => setVolet("statut")}>
+                      Changer le statut
+                    </button>
+                    <button type="button" className="bouton doux" onClick={() => setVolet("lien")}>
+                      Lien de suivi
+                    </button>
+                  </>
                 )}
               </div>
-            </Carte>
+            </Bloc>
 
-            <Carte titre="Progression">
-              <div className="rangee espace" style={{ marginBottom: 6 }}>
-                <span className="doux">
-                  {donnees.progression.pourcentage} % du parcours
-                </span>
+            <div style={{ display: "grid", gap: 12, alignContent: "start" }}>
+              <Bloc titre="Progression">
+                <LigneProgression
+                  libelle="Conduite"
+                  fait={donnees.progression.heuresConduiteFaites}
+                  prevu={donnees.progression.heuresConduitePrevues}
+                />
+                <LigneProgression
+                  libelle="Code"
+                  fait={donnees.progression.heuresCodeFaites}
+                  prevu={donnees.progression.heuresCodePrevues}
+                />
                 {donnees.progression.pretPourExamen && (
-                  <span className="badge vert">Prêt pour l'examen</span>
+                  <Avis ton="succes">Heures terminées — l'élève peut être présenté à l'examen.</Avis>
                 )}
-              </div>
-              <Jauge pourcentage={donnees.progression.pourcentage} />
-              <div className="grille-3" style={{ marginTop: 12 }}>
-                <div>
-                  <div className="faible">Code</div>
-                  <strong className="nombre">
-                    {donnees.progression.heuresCodeFaites} / {donnees.progression.heuresCodePrevues} h
-                  </strong>
-                </div>
-                <div>
-                  <div className="faible">Conduite</div>
-                  <strong className="nombre">
-                    {donnees.progression.heuresConduiteFaites} / {donnees.progression.heuresConduitePrevues} h
-                  </strong>
-                </div>
-                <div>
-                  <div className="faible">Examens</div>
-                  <strong style={{ fontSize: 13 }}>
-                    {LIBELLE_RESULTAT[donnees.eleve.resultatCode]} ·{" "}
-                    {LIBELLE_RESULTAT[donnees.eleve.resultatConduite]}
-                  </strong>
-                </div>
-              </div>
-            </Carte>
+              </Bloc>
 
-            <Carte
-              titre="Situation financière"
-              action={
-                peutGerer ? (
-                  <button type="button" className="bouton petit" onClick={() => setFeuille("paiement")}>
-                    + Encaisser
-                  </button>
-                ) : undefined
-              }
-            >
-              <div className="rangee espace">
-                <span className="doux">Montant de la formation</span>
-                <strong className="nombre">{fFCFA(donnees.solde.montantTotal)}</strong>
-              </div>
-              <div className="rangee espace">
-                <span className="doux">Déjà versé</span>
-                <strong className="nombre" style={{ color: "var(--vert)" }}>
-                  {fFCFA(donnees.solde.totalPaye)}
-                </strong>
-              </div>
-              <div className="rangee espace">
-                <span className="doux">Reste à payer</span>
-                <strong
-                  className="nombre"
-                  style={{ color: donnees.solde.reste > 0 ? "var(--orange)" : "var(--vert)" }}
-                >
-                  {fFCFA(donnees.solde.reste)}
-                </strong>
-              </div>
-              {donnees.solde.tropPercu > 0 && (
-                <Message ton="alerte">
-                  Trop-perçu de {fFCFA(donnees.solde.tropPercu)} — à vérifier en caisse.
-                </Message>
-              )}
-              <div style={{ marginTop: 10 }}>
-                <Jauge
+              <Bloc titre="Situation financière">
+                <div className="ligne-flex espace" style={{ marginBottom: 6 }}>
+                  <div>
+                    <div className="faible">Frais</div>
+                    <div className="mono" style={{ fontSize: 16, fontWeight: 600 }}>
+                      {fFCFA(donnees.solde.montantTotal)}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="faible">Réglé</div>
+                    <div className="mono" style={{ fontSize: 16, fontWeight: 600, color: "var(--vert)" }}>
+                      {fFCFA(donnees.solde.totalPaye)}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <div className="faible">Solde</div>
+                    <div
+                      className="mono"
+                      style={{
+                        fontSize: 16, fontWeight: 600,
+                        color: donnees.solde.reste > 0 ? "var(--orange)" : "var(--vert)",
+                      }}
+                    >
+                      {fFCFA(donnees.solde.reste)}
+                    </div>
+                  </div>
+                </div>
+                <Barre
                   pourcentage={donnees.solde.tauxRecouvrement}
                   ton={donnees.solde.tauxRecouvrement < 50 ? "orange" : undefined}
                 />
-              </div>
-            </Carte>
-
-            <Carte titre={`Versements (${donnees.paiements.length})`}>
-              {donnees.paiements.length === 0 ? (
-                <p className="doux">Aucun versement enregistré.</p>
-              ) : (
-                <div className="liste">
-                  {donnees.paiements.map((p) => (
-                    <div key={p.id} className="ligne" style={{ cursor: "default" }}>
-                      <div className="corps">
-                        <div className="principal">{fFCFA(p.montant)}</div>
-                        <div className="secondaire">
-                          {fDate(p.date)} · {LIBELLE_MOYEN[p.moyen]} · {p.numeroRecu}
-                        </div>
-                      </div>
-                      {estDirecteur && (
-                        <button
-                          type="button"
-                          className="bouton fantome petit"
-                          onClick={async () => {
-                            if (!confirm(`Annuler définitivement le reçu ${p.numeroRecu} ?`)) return;
-                            await api.delete(`/api/paiements/${p.id}`);
-                            recharger();
-                          }}
-                        >
-                          Annuler
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </Carte>
-
-            <Carte titre={`Séances (${donnees.seances.length})`}>
-              {donnees.seances.length === 0 ? (
-                <Vide icone="📅">Aucune séance planifiée.</Vide>
-              ) : (
-                <div className="liste">
-                  {donnees.seances.slice(0, 15).map((s) => (
-                    <div key={s.id} className="ligne" style={{ cursor: "default" }}>
-                      <div className="corps">
-                        <div className="principal">
-                          {LIBELLE_TYPE_SEANCE[s.type]} · {fDuree(s.debut, s.fin)}
-                        </div>
-                        <div className="secondaire">{fDateHeure(s.debut)}</div>
-                        {s.motif && <div className="faible">Motif : {s.motif}</div>}
-                      </div>
-                      <div className="droite">
-                        <BadgeStatutSeance statut={s.statut} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </Carte>
-
-            {peutGerer && (
-              <Carte titre="Statut du dossier">
-                <button
-                  type="button"
-                  className="bouton doux large"
-                  onClick={() => setFeuille("statut")}
-                >
-                  Changer le statut
-                </button>
-                {(donnees.eleve.historiqueStatuts ?? []).length > 0 && (
-                  <div className="liste" style={{ marginTop: 10 }}>
-                    {(donnees.eleve.historiqueStatuts ?? []).slice().reverse().map((h, i) => (
-                      <div key={i} className="ligne" style={{ cursor: "default" }}>
-                        <div className="corps">
-                          <div className="principal">{LIBELLE_STATUT_ELEVE[h.statut]}</div>
-                          <div className="secondaire">
-                            {fDateHeure(h.horodatage)}
-                            {h.motif ? ` — ${h.motif}` : ""}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                {donnees.solde.tropPercu > 0 && (
+                  <Avis ton="alerte">
+                    Trop-perçu de {fFCFA(donnees.solde.tropPercu)} — à vérifier en caisse.
+                  </Avis>
                 )}
-              </Carte>
+                {donnees.solde.reste > 0 && (
+                  <a
+                    className="bouton doux large"
+                    style={{ marginTop: 10 }}
+                    href={lienWhatsApp(
+                      e.telephone,
+                      `Bonjour ${e.prenoms}, il reste ${donnees.solde.reste} FCFA à régler pour votre formation. Merci de passer à l'auto-école.`,
+                    )}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Relancer par WhatsApp
+                  </a>
+                )}
+              </Bloc>
+            </div>
+          </div>
+
+          <div className="filtres">
+            <button
+              type="button"
+              className={`puce${onglet === "paiements" ? " actif" : ""}`}
+              onClick={() => setOnglet("paiements")}
+            >
+              Paiements ({donnees.paiements.length})
+            </button>
+            <button
+              type="button"
+              className={`puce${onglet === "seances" ? " actif" : ""}`}
+              onClick={() => setOnglet("seances")}
+            >
+              Séances ({donnees.seances.length})
+            </button>
+          </div>
+
+          <Bloc sansPadding>
+            {onglet === "paiements" ? (
+              donnees.paiements.length === 0 ? (
+                <Desert glyphe="◳">Aucun versement enregistré.</Desert>
+              ) : (
+                <Grille
+                  colonnes={[
+                    { cle: "recu", libelle: "Reçu" },
+                    { cle: "date", libelle: "Date" },
+                    { cle: "moyen", libelle: "Moyen" },
+                    { cle: "montant", libelle: "Montant", droite: true },
+                    ...(estDirecteur ? [{ cle: "act", libelle: "", droite: true }] : []),
+                  ]}
+                >
+                  {donnees.paiements.map((p) => (
+                    <tr key={p.id}>
+                      <td className="num">{p.numeroRecu}</td>
+                      <td className="num">{fDate(p.date)}</td>
+                      <td><span className="jeton orange">{LIBELLE_MOYEN[p.moyen]}</span></td>
+                      <td className="num droite">{fFCFA(p.montant)}</td>
+                      {estDirecteur && (
+                        <td className="droite">
+                          <button
+                            type="button"
+                            className="bouton nu"
+                            onClick={async () => {
+                              if (!confirm(`Annuler définitivement le reçu ${p.numeroRecu} ?`)) return;
+                              await api.delete(`/api/paiements/${p.id}`);
+                              recharger();
+                            }}
+                          >
+                            Annuler
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </Grille>
+              )
+            ) : donnees.seances.length === 0 ? (
+              <Desert glyphe="◰">Aucune séance planifiée.</Desert>
+            ) : (
+              <Grille
+                colonnes={[
+                  { cle: "date", libelle: "Date" },
+                  { cle: "type", libelle: "Type" },
+                  { cle: "duree", libelle: "Durée" },
+                  { cle: "motif", libelle: "Motif" },
+                  { cle: "statut", libelle: "Statut", droite: true },
+                ]}
+              >
+                {donnees.seances.map((s) => (
+                  <tr key={s.id}>
+                    <td className="num">{fDateHeure(s.debut)}</td>
+                    <td>{LIBELLE_TYPE_SEANCE[s.type]}</td>
+                    <td className="num">{fDuree(s.debut, s.fin)}</td>
+                    <td className="faible">{s.motif || "—"}</td>
+                    <td className="droite"><JetonStatutSeance statut={s.statut} /></td>
+                  </tr>
+                ))}
+              </Grille>
             )}
+          </Bloc>
 
-            <p className="centre">
-              <Link to="/eleves" className="doux">← Tous les élèves</Link>
-            </p>
-          </>
-        )}
-      </main>
+          {(e.historiqueStatuts ?? []).length > 0 && (
+            <Bloc titre="Historique du dossier" sansPadding>
+              <Grille
+                colonnes={[
+                  { cle: "quand", libelle: "Date" },
+                  { cle: "statut", libelle: "Statut" },
+                  { cle: "motif", libelle: "Motif" },
+                ]}
+              >
+                {(e.historiqueStatuts ?? []).slice().reverse().map((h, i) => (
+                  <tr key={i}>
+                    <td className="num">{fDateHeure(h.horodatage)}</td>
+                    <td>{LIBELLE_STATUT_ELEVE[h.statut]}</td>
+                    <td className="faible">{h.motif || "—"}</td>
+                  </tr>
+                ))}
+              </Grille>
+            </Bloc>
+          )}
+        </>
+      )}
 
-      {feuille === "paiement" && donnees && (
-        <FeuillePaiement
+      {volet === "paiement" && donnees && (
+        <VoletPaiement
           eleve={donnees.eleve}
           reste={donnees.solde.reste}
-          onFermer={() => setFeuille(null)}
-          onEnregistre={() => { setFeuille(null); recharger(); }}
+          onFermer={() => setVolet(null)}
+          onEnregistre={() => { setVolet(null); recharger(); }}
         />
       )}
 
-      {feuille === "statut" && donnees && (
-        <FeuilleStatut
+      {volet === "statut" && donnees && (
+        <VoletStatut
           statutActuel={donnees.eleve.statut}
           eleveId={donnees.eleve.id}
-          onFermer={() => setFeuille(null)}
-          onEnregistre={() => { setFeuille(null); recharger(); }}
+          onFermer={() => setVolet(null)}
+          onEnregistre={() => { setVolet(null); recharger(); }}
         />
       )}
 
-      {feuille === "lien" && donnees && (
-        <Feuille titre="Lien de suivi de l'élève" onFermer={() => { setFeuille(null); setLienGenere(null); }}>
-          <p className="doux">
-            Générer un nouveau lien invalide immédiatement le précédent. Utile
-            si l'élève a changé de téléphone ou si le lien a été partagé.
+      {volet === "lien" && donnees && e && (
+        <Volet
+          titre="Lien de suivi de l'élève"
+          onFermer={() => { setVolet(null); setLienGenere(null); }}
+        >
+          <p className="faible">
+            Générer un nouveau lien invalide immédiatement le précédent. Utile si
+            l'élève a changé de téléphone ou si le lien a circulé.
           </p>
           {lienGenere ? (
             <>
-              <input readOnly value={lienGenere} onFocus={(e) => e.target.select()} />
+              <input readOnly value={lienGenere} onFocus={(ev) => ev.target.select()} />
               <a
                 className="bouton large"
                 style={{ marginTop: 10 }}
                 href={lienWhatsApp(
-                  donnees.eleve.telephone,
-                  `Bonjour ${donnees.eleve.prenoms}, voici votre espace de suivi : ${lienGenere}`,
+                  e.telephone,
+                  `Bonjour ${e.prenoms}, voici votre espace de suivi : ${lienGenere}`,
                 )}
                 target="_blank"
                 rel="noreferrer"
@@ -304,7 +327,7 @@ export default function EleveDetail() {
               className="bouton large"
               onClick={async () => {
                 const reponse = await api.post<{ portailJeton: string }>(
-                  `/api/eleves/${donnees.eleve.id}/lien-portail`,
+                  `/api/eleves/${e.id}/lien-portail`,
                 );
                 setLienGenere(lienPortail(reponse.portailJeton));
               }}
@@ -312,13 +335,40 @@ export default function EleveDetail() {
               Générer un nouveau lien
             </button>
           )}
-        </Feuille>
+        </Volet>
       )}
-    </>
+    </Atelier>
   );
 }
 
-function FeuillePaiement({
+function DetailLigne({ libelle, valeur }: { libelle: string; valeur: string }) {
+  return (
+    <div
+      className="ligne-flex espace"
+      style={{ padding: "5px 0", borderBottom: "1px solid var(--bordure)" }}
+    >
+      <span className="faible">{libelle}</span>
+      <span style={{ fontSize: 12.5, fontWeight: 500 }}>{valeur}</span>
+    </div>
+  );
+}
+
+function LigneProgression({
+  libelle, fait, prevu,
+}: { libelle: string; fait: number; prevu: number }) {
+  const pct = prevu === 0 ? 100 : Math.min(100, Math.round((fait / prevu) * 100));
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <div className="ligne-flex espace" style={{ marginBottom: 4 }}>
+        <span className="faible">{libelle} · {fait}/{prevu} h</span>
+        <span className="mono faible">{pct} %</span>
+      </div>
+      <Barre pourcentage={pct} />
+    </div>
+  );
+}
+
+function VoletPaiement({
   eleve, reste, onFermer, onEnregistre,
 }: { eleve: Eleve; reste: number; onFermer: () => void; onEnregistre: () => void }) {
   const { envoi, erreur, executer } = useEnvoi();
@@ -326,8 +376,8 @@ function FeuillePaiement({
   const [moyen, setMoyen] = useState<MoyenPaiement>("especes");
   const [date, setDate] = useState(aujourdhuiISO());
   const [reference, setReference] = useState("");
-  // Généré une seule fois par ouverture de la feuille : c'est ce qui rend
-  // l'envoi idempotent si l'utilisateur valide deux fois.
+  // Généré une seule fois par ouverture : c'est ce qui rend l'envoi idempotent
+  // si l'utilisateur valide deux fois.
   const [opId] = useState(nouvelOpId);
 
   const valeur = Number(montant) || 0;
@@ -343,9 +393,9 @@ function FeuillePaiement({
   }
 
   return (
-    <Feuille titre="Enregistrer un versement" onFermer={onFermer}>
-      <p className="doux">
-        {eleve.prenoms} {eleve.nom} — reste à payer <strong>{fFCFA(reste)}</strong>
+    <Volet titre="Enregistrer un versement" onFermer={onFermer}>
+      <p className="faible">
+        {eleve.prenoms} {eleve.nom} — solde <strong className="mono">{fFCFA(reste)}</strong>
       </p>
       <form onSubmit={soumettre}>
         <Champ etiquette="Montant reçu (FCFA)">
@@ -359,13 +409,13 @@ function FeuillePaiement({
           />
         </Champ>
         {reste > 0 && (
-          <div className="rangee" style={{ gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
-            <button type="button" className="bouton doux petit" onClick={() => setMontant(String(reste))}>
-              Solde entier ({fFCFA(reste)})
+          <div className="ligne-flex" style={{ gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
+            <button type="button" className="bouton doux" onClick={() => setMontant(String(reste))}>
+              Solde entier
             </button>
             <button
               type="button"
-              className="bouton doux petit"
+              className="bouton doux"
               onClick={() => setMontant(String(Math.round(reste / 2)))}
             >
               Moitié
@@ -389,11 +439,9 @@ function FeuillePaiement({
         )}
 
         {valeur > reste && reste > 0 && (
-          <Message ton="alerte">
-            Ce montant dépasse le reste dû de {fFCFA(valeur - reste)}.
-          </Message>
+          <Avis ton="alerte">Ce montant dépasse le solde de {fFCFA(valeur - reste)}.</Avis>
         )}
-        {erreur && <Message ton="erreur">{erreur}</Message>}
+        {erreur && <Avis ton="erreur">{erreur}</Avis>}
 
         <div className="actions" style={{ marginTop: 14 }}>
           <button type="button" className="bouton doux" onClick={onFermer}>Annuler</button>
@@ -402,11 +450,11 @@ function FeuillePaiement({
           </button>
         </div>
       </form>
-    </Feuille>
+    </Volet>
   );
 }
 
-function FeuilleStatut({
+function VoletStatut({
   statutActuel, eleveId, onFermer, onEnregistre,
 }: {
   statutActuel: StatutEleve; eleveId: string;
@@ -425,14 +473,13 @@ function FeuilleStatut({
   }
 
   return (
-    <Feuille titre="Changer le statut" onFermer={onFermer}>
+    <Volet titre="Changer le statut" onFermer={onFermer}>
       <form onSubmit={soumettre}>
         <Champ etiquette="Nouveau statut">
           <select value={statut} onChange={(e) => setStatut(e.target.value as StatutEleve)}>
             {(Object.keys(LIBELLE_STATUT_ELEVE) as StatutEleve[]).map((s) => (
               <option key={s} value={s} disabled={s === statutActuel}>
-                {LIBELLE_STATUT_ELEVE[s]}
-                {s === statutActuel ? " (actuel)" : ""}
+                {LIBELLE_STATUT_ELEVE[s]}{s === statutActuel ? " (actuel)" : ""}
               </option>
             ))}
           </select>
@@ -444,7 +491,7 @@ function FeuilleStatut({
           <textarea value={motif} onChange={(e) => setMotif(e.target.value)} maxLength={2000} />
         </Champ>
 
-        {erreur && <Message ton="erreur">{erreur}</Message>}
+        {erreur && <Avis ton="erreur">{erreur}</Avis>}
 
         <div className="actions" style={{ marginTop: 14 }}>
           <button type="button" className="bouton doux" onClick={onFermer}>Annuler</button>
@@ -453,6 +500,6 @@ function FeuilleStatut({
           </button>
         </div>
       </form>
-    </Feuille>
+    </Volet>
   );
 }

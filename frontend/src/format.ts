@@ -54,11 +54,11 @@ export function aujourdhuiISO(): string {
 }
 
 export const LIBELLE_STATUT_ELEVE: Record<StatutEleve, string> = {
-  actif: "Actif",
+  actif: "En formation",
   suspendu: "Suspendu",
-  diplome: "Diplômé",
+  diplome: "Permis obtenu",
   abandon: "Abandon",
-  recale: "Recalé",
+  recale: "Ajourné",
 };
 
 export const LIBELLE_MOYEN: Record<MoyenPaiement, string> = {

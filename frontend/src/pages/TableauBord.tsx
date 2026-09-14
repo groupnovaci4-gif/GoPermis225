@@ -1,214 +1,233 @@
-/** Accueil du directeur : l'état de l'école en 30 secondes. */
+/** Tableau de bord du directeur : l'état de l'école en un écran. */
 
 import { Link } from "react-router-dom";
 
 import { api } from "../api";
-import { Carte, Chargement, Jauge, Message, Tuile, Vide } from "../components/ui";
-import { fCompact, fDate, fFCFA } from "../format";
+import { Atelier } from "../components/Atelier";
+import { Avis, Barre, Bloc, Chargement, Desert, Grille, Indicateur } from "../components/ui";
+import { fDate, fFCFA } from "../format";
 import { useChargement } from "../hooks";
-import { useSession } from "../session";
 import type { TableauBord as DonneesBord } from "../types";
 
+const AUJOURDHUI = new Date().toLocaleDateString("fr-FR", {
+  weekday: "long", day: "numeric", month: "long",
+});
+
 export default function TableauBord() {
-  const { session, deconnecter } = useSession();
   const { donnees, chargement, erreur } = useChargement<DonneesBord>(
     () => api.get<DonneesBord>("/api/tableau-bord"),
   );
 
   return (
-    <>
-      <header className="entete">
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <h1>{session?.ecole?.nom ?? "Mon auto-école"}</h1>
-          <div className="sous">{session?.utilisateur?.nom}</div>
-        </div>
-        <button type="button" className="bouton doux petit" onClick={deconnecter}>
-          Quitter
-        </button>
-      </header>
+    <Atelier
+      titre="Tableau de bord"
+      sous={AUJOURDHUI}
+      outils={<Link to="/comptabilite" className="bouton">Encaisser</Link>}
+    >
+      {chargement && <Chargement lignes={5} />}
+      {erreur && <Avis ton="erreur">{erreur}</Avis>}
 
-      <main className="contenu">
-        {chargement && <Chargement lignes={4} />}
-        {erreur && <Message ton="erreur">{erreur}</Message>}
+      {donnees && (
+        <>
+          <div className="rangs">
+            <Indicateur
+              glyphe="◲"
+              libelle="Élèves actifs"
+              valeur={donnees.kpis.elevesActifs}
+              note={`${donnees.kpis.elevesTotal} dossiers au total`}
+            />
+            <Indicateur
+              glyphe="◳"
+              ton="vert"
+              libelle="Recettes du jour"
+              valeur={fFCFA(donnees.kpis.encaisseJour)}
+              note={`${fFCFA(donnees.kpis.encaisseMois)} ce mois`}
+            />
+            <Indicateur
+              glyphe="↗"
+              ton={donnees.kpis.resteARecouvrer > 0 ? "orange" : undefined}
+              libelle="Créances ouvertes"
+              valeur={fFCFA(donnees.kpis.resteARecouvrer)}
+              note="Soldes élèves restant à encaisser"
+            />
+            <Indicateur
+              glyphe="✓"
+              libelle="Taux de réussite"
+              valeur={`${donnees.kpis.tauxReussite} %`}
+              note={`${donnees.kpis.diplomes} permis obtenus`}
+            />
+          </div>
 
-        {donnees && (
-          <>
-            <div className="grille">
-              <Tuile
-                libelle="Élèves actifs"
-                valeur={donnees.kpis.elevesActifs}
-                detail={`${donnees.kpis.elevesTotal} au total`}
-              />
-              <Tuile
-                libelle="Encaissé ce jour"
-                valeur={fCompact(donnees.kpis.encaisseJour)}
-                detail="FCFA"
-                ton="vert"
-              />
-              <Tuile
-                libelle="Reste à recouvrer"
-                valeur={fCompact(donnees.kpis.resteARecouvrer)}
-                detail="FCFA"
-                ton={donnees.kpis.resteARecouvrer > 0 ? "orange" : undefined}
-              />
-              <Tuile
-                libelle="Taux de réussite"
-                valeur={`${donnees.kpis.tauxReussite} %`}
-                detail={`${donnees.kpis.diplomes} diplômés`}
-              />
-            </div>
+          <div className="rangs-3">
+            <Indicateur
+              glyphe="◰"
+              libelle="Séances aujourd'hui"
+              valeur={donnees.kpis.seancesJour}
+            />
+            <Indicateur
+              glyphe="↘"
+              ton="rouge"
+              libelle="Dépenses du mois"
+              valeur={fFCFA(donnees.kpis.depensesMois)}
+              note={`Bénéfice : ${fFCFA(donnees.kpis.beneficeMois)}`}
+            />
+            <Indicateur
+              glyphe="⚠"
+              ton={donnees.alertesVehicules.length ? "orange" : undefined}
+              libelle="Alertes flotte"
+              valeur={donnees.alertesVehicules.length}
+              note="Assurance / visite technique"
+            />
+          </div>
 
-            <Carte titre="Résultat du mois">
-              <div className="rangee espace">
-                <span className="doux">Recettes</span>
-                <strong className="nombre">{fFCFA(donnees.kpis.encaisseMois)}</strong>
-              </div>
-              <div className="rangee espace">
-                <span className="doux">Dépenses</span>
-                <strong className="nombre">− {fFCFA(donnees.kpis.depensesMois)}</strong>
-              </div>
-              <div
-                className="rangee espace"
-                style={{ borderTop: "1px solid var(--bordure)", marginTop: 8, paddingTop: 8 }}
-              >
-                <strong>Bénéfice</strong>
-                <strong
-                  className="nombre"
-                  style={{ color: donnees.kpis.beneficeMois >= 0 ? "var(--vert)" : "var(--rouge)" }}
-                >
-                  {fFCFA(donnees.kpis.beneficeMois)}
-                </strong>
-              </div>
-            </Carte>
+          <div className="rangs-2">
+            <Bloc titre="Recettes — évolution sur 12 mois">
+              <Courbe donnees={donnees.revenusParMois} />
+            </Bloc>
 
-            <Carte titre="Revenus des 12 derniers mois">
-              <GraphiqueRevenus donnees={donnees.revenusParMois} />
-            </Carte>
-
-            <Carte
-              titre={`Prêts pour l'examen (${donnees.elevesPretsExamen.length})`}
-              action={<Link to="/eleves">Tous les élèves</Link>}
+            <Bloc
+              titre={`Examens — prêts à passer (${donnees.elevesPretsExamen.length})`}
+              action={<Link to="/eleves" className="lien-fiche">Tous les élèves</Link>}
             >
               {donnees.elevesPretsExamen.length === 0 ? (
-                <p className="doux">
-                  Aucun élève n'a terminé ses heures de code et de conduite.
-                </p>
+                <Desert glyphe="◷">
+                  Aucun élève n'a encore terminé ses heures de code et de conduite.
+                </Desert>
               ) : (
-                <div className="liste">
+                <div>
                   {donnees.elevesPretsExamen.slice(0, 6).map((e) => (
                     <Link
                       key={e.eleveId}
                       to={`/eleves/${e.eleveId}`}
-                      className="ligne"
-                      style={{ textDecoration: "none", color: "inherit" }}
+                      className="ligne-flex"
+                      style={{
+                        padding: "8px 0", gap: 12,
+                        borderBottom: "1px solid var(--bordure)",
+                        textDecoration: "none", color: "inherit",
+                      }}
                     >
-                      <div className="corps">
-                        <div className="principal">{e.prenoms} {e.nom}</div>
-                        <div className="secondaire">{e.matricule}</div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 12.5, fontWeight: 600 }}>
+                          {e.prenoms} {e.nom}
+                        </div>
+                        <Barre pourcentage={e.pourcentage} />
                       </div>
-                      <div className="droite doux">
-                        {e.heuresCodeFaites} h code · {e.heuresConduiteFaites} h conduite
-                      </div>
+                      <span className="mono faible">{e.pourcentage} %</span>
                     </Link>
                   ))}
                 </div>
               )}
-            </Carte>
+            </Bloc>
+          </div>
 
-            <Carte
-              titre="Moniteurs"
-              action={<Link to="/personnel">Gérer</Link>}
-            >
-              {donnees.performanceMoniteurs.length === 0 ? (
-                <Vide icone="👨‍🏫">Aucun moniteur enregistré.</Vide>
-              ) : (
-                <div className="liste">
-                  {donnees.performanceMoniteurs.map((m) => (
-                    <div key={m.moniteurId} className="ligne" style={{ cursor: "default" }}>
-                      <div className="corps">
-                        <div className="principal">{m.nom}</div>
-                        <div className="secondaire">
-                          {m.elevesFormes} élève{m.elevesFormes > 1 ? "s" : ""} ·{" "}
-                          {m.heures} h effectuées
-                        </div>
-                        <div style={{ marginTop: 6, maxWidth: 180 }}>
-                          <Jauge pourcentage={m.tauxReussite} />
-                        </div>
-                      </div>
-                      <div className="droite">
-                        <div><strong>{m.tauxReussite} %</strong></div>
-                        <div className="faible">{fFCFA(m.montant)}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </Carte>
+          <Bloc titre="Moniteurs — performance et rémunération" sansPadding>
+            {donnees.performanceMoniteurs.length === 0 ? (
+              <Desert glyphe="◵">Aucun moniteur enregistré.</Desert>
+            ) : (
+              <Grille
+                colonnes={[
+                  { cle: "nom", libelle: "Moniteur" },
+                  { cle: "eleves", libelle: "Élèves formés", droite: true },
+                  { cle: "taux", libelle: "Réussite", droite: true },
+                  { cle: "heures", libelle: "Heures", droite: true },
+                  { cle: "paie", libelle: "Rémunération", droite: true },
+                ]}
+              >
+                {donnees.performanceMoniteurs.map((m) => (
+                  <tr key={m.moniteurId}>
+                    <td className="nom-primaire">{m.nom}</td>
+                    <td className="num droite">{m.elevesFormes}</td>
+                    <td className="num droite">{m.tauxReussite} %</td>
+                    <td className="num droite">{m.heures} h</td>
+                    <td className="num droite">{fFCFA(m.montant)}</td>
+                  </tr>
+                ))}
+              </Grille>
+            )}
+          </Bloc>
 
-            <Carte
-              titre={`Alertes véhicules (${donnees.alertesVehicules.length})`}
-              action={<Link to="/vehicules">Le parc</Link>}
+          {donnees.alertesVehicules.length > 0 && (
+            <Bloc
+              titre={`Flotte — échéances à surveiller (${donnees.alertesVehicules.length})`}
+              action={<Link to="/flotte" className="lien-fiche">Le parc</Link>}
+              sansPadding
             >
-              {donnees.alertesVehicules.length === 0 ? (
-                <p className="doux">Aucune échéance à surveiller dans les 30 jours.</p>
-              ) : (
-                <div className="liste">
-                  {donnees.alertesVehicules.map((a, i) => (
-                    <div key={`${a.vehiculeId}-${a.champ}-${i}`} className="ligne" style={{ cursor: "default" }}>
-                      <div className="corps">
-                        <div className="principal">{a.immatriculation}</div>
-                        <div className="secondaire">
-                          {a.libelle} · {fDate(a.echeance)}
-                        </div>
-                      </div>
-                      <div className="droite">
-                        <span className={`badge ${a.niveau === "expire" ? "rouge" : "orange"}`}>
-                          {a.niveau === "expire"
-                            ? `Expiré depuis ${Math.abs(a.jours)} j`
-                            : `Dans ${a.jours} j`}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </Carte>
-          </>
-        )}
-      </main>
-    </>
+              <Grille
+                colonnes={[
+                  { cle: "immat", libelle: "Véhicule" },
+                  { cle: "quoi", libelle: "Document" },
+                  { cle: "quand", libelle: "Échéance" },
+                  { cle: "etat", libelle: "", droite: true },
+                ]}
+              >
+                {donnees.alertesVehicules.map((a, i) => (
+                  <tr key={`${a.vehiculeId}-${a.champ}-${i}`}>
+                    <td className="nom-primaire mono">{a.immatriculation}</td>
+                    <td>{a.libelle}</td>
+                    <td className="num">{fDate(a.echeance)}</td>
+                    <td className="droite">
+                      <span className={`jeton ${a.niveau === "expire" ? "rouge" : "orange"}`}>
+                        {a.niveau === "expire"
+                          ? `Expiré depuis ${Math.abs(a.jours)} j`
+                          : `Dans ${a.jours} j`}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </Grille>
+            </Bloc>
+          )}
+        </>
+      )}
+    </Atelier>
   );
 }
 
-/** Histogramme simple en CSS : pas de librairie pour douze barres. */
-function GraphiqueRevenus({
-  donnees,
-}: { donnees: { libelle: string; montant: number }[] }) {
+/** Courbe d'aire en SVG — douze points ne justifient pas une librairie. */
+function Courbe({ donnees }: { donnees: { libelle: string; montant: number }[] }) {
+  const L = 560;
+  const H = 150;
+  const marge = { haut: 10, bas: 22, gauche: 4, droite: 4 };
   const maximum = Math.max(1, ...donnees.map((d) => d.montant));
+  const largeurUtile = L - marge.gauche - marge.droite;
+  const hauteurUtile = H - marge.haut - marge.bas;
+
+  const points = donnees.map((d, i) => {
+    const x = marge.gauche + (i * largeurUtile) / Math.max(1, donnees.length - 1);
+    const y = marge.haut + hauteurUtile - (d.montant / maximum) * hauteurUtile;
+    return { x, y, ...d };
+  });
+
+  const trace = points.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+  const aire = `${trace} L${points[points.length - 1]?.x.toFixed(1)},${(marge.haut + hauteurUtile).toFixed(1)} L${points[0]?.x.toFixed(1)},${(marge.haut + hauteurUtile).toFixed(1)} Z`;
+
   return (
-    <div
-      style={{ display: "flex", alignItems: "flex-end", gap: 4, height: 110 }}
+    <svg
+      viewBox={`0 0 ${L} ${H}`}
+      style={{ width: "100%", height: 150 }}
       role="img"
-      aria-label={`Revenus mensuels : ${donnees
-        .map((d) => `${d.libelle} ${d.montant} FCFA`)
-        .join(", ")}`}
+      aria-label={`Recettes mensuelles : ${donnees.map((d) => `${d.libelle} ${d.montant} FCFA`).join(", ")}`}
     >
-      {donnees.map((d) => (
-        <div key={d.libelle} style={{ flex: 1, textAlign: "center", minWidth: 0 }}>
-          <div
-            title={`${d.libelle} — ${fFCFA(d.montant)}`}
-            style={{
-              height: `${Math.round((d.montant / maximum) * 84)}px`,
-              minHeight: 2,
-              background: d.montant > 0 ? "var(--vert)" : "var(--bordure)",
-              borderRadius: "4px 4px 0 0",
-            }}
-          />
-          <div className="faible" style={{ fontSize: 9, marginTop: 3 }}>
-            {d.libelle.slice(0, 2)}
-          </div>
-        </div>
+      <defs>
+        <linearGradient id="degradeRecettes" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="var(--vert)" stopOpacity="0.22" />
+          <stop offset="100%" stopColor="var(--vert)" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path d={aire} fill="url(#degradeRecettes)" />
+      <path d={trace} fill="none" stroke="var(--vert)" strokeWidth="2" strokeLinejoin="round" />
+      {points.map((p) => (
+        <text
+          key={p.libelle}
+          x={p.x}
+          y={H - 6}
+          textAnchor="middle"
+          fontSize="9"
+          fill="var(--texte-faible)"
+        >
+          {p.libelle.slice(0, 2)}
+        </text>
       ))}
-    </div>
+    </svg>
   );
 }

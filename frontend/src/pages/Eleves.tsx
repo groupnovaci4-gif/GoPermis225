@@ -1,11 +1,12 @@
-/** Liste des élèves, recherche, filtres et inscription. */
+/** Liste des élèves : tableau dense, recherche, filtre par statut. */
 
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
 import { api } from "../api";
+import { Atelier } from "../components/Atelier";
 import {
-  BadgeStatutEleve, Carte, Champ, Chargement, Feuille, Initiales, Message, Vide,
+  Avis, Bloc, Champ, Chargement, Desert, Grille, JetonStatutEleve, Volet,
 } from "../components/ui";
 import { LIBELLE_CATEGORIE, fFCFA, lienPortail, lienWhatsApp } from "../format";
 import { useChargement, useEnvoi } from "../hooks";
@@ -13,19 +14,20 @@ import { useSession } from "../session";
 import type { Categorie, Eleve, StatutEleve } from "../types";
 
 const FILTRES: { valeur: StatutEleve | "tous"; libelle: string }[] = [
-  { valeur: "tous", libelle: "Tous" },
-  { valeur: "actif", libelle: "Actifs" },
+  { valeur: "tous", libelle: "Tous les statuts" },
+  { valeur: "actif", libelle: "En formation" },
   { valeur: "suspendu", libelle: "Suspendus" },
-  { valeur: "diplome", libelle: "Diplômés" },
+  { valeur: "diplome", libelle: "Permis obtenu" },
   { valeur: "abandon", libelle: "Abandons" },
+  { valeur: "recale", libelle: "Ajournés" },
 ];
 
 export default function Eleves() {
   const { peutGerer } = useSession();
   const [filtre, setFiltre] = useState<StatutEleve | "tous">("tous");
   const [recherche, setRecherche] = useState("");
-  const [ouvrirFormulaire, setOuvrirFormulaire] = useState(false);
-  const [nouveauLien, setNouveauLien] = useState<{ eleve: Eleve; lien: string } | null>(null);
+  const [creation, setCreation] = useState(false);
+  const [nouveau, setNouveau] = useState<{ eleve: Eleve; lien: string } | null>(null);
 
   const requete = new URLSearchParams();
   if (filtre !== "tous") requete.set("statut", filtre);
@@ -37,126 +39,126 @@ export default function Eleves() {
   );
 
   return (
-    <>
-      <header className="entete">
-        <h1>Élèves</h1>
-        {peutGerer && (
-          <button type="button" className="bouton petit" onClick={() => setOuvrirFormulaire(true)}>
-            + Inscrire
+    <Atelier
+      titre="Élèves"
+      sous={donnees ? `${donnees.length} dossier(s) affiché(s)` : undefined}
+      outils={
+        peutGerer ? (
+          <button type="button" className="bouton" onClick={() => setCreation(true)}>
+            Nouvel élève
           </button>
-        )}
-      </header>
-
-      <main className="contenu">
+        ) : undefined
+      }
+    >
+      <div className="ligne-flex" style={{ gap: 10, flexWrap: "wrap" }}>
         <input
           type="search"
           value={recherche}
           onChange={(e) => setRecherche(e.target.value)}
-          placeholder="Rechercher un nom, un matricule, un numéro…"
+          placeholder="Rechercher un nom, un matricule, un téléphone…"
           aria-label="Rechercher un élève"
+          style={{ flex: 1, minWidth: 220 }}
         />
-
-        <div className="filtres">
+        <select
+          value={filtre}
+          onChange={(e) => setFiltre(e.target.value as StatutEleve | "tous")}
+          aria-label="Filtrer par statut"
+          style={{ width: "auto", minWidth: 165 }}
+        >
           {FILTRES.map((f) => (
-            <button
-              key={f.valeur}
-              type="button"
-              className={`puce${filtre === f.valeur ? " actif" : ""}`}
-              onClick={() => setFiltre(f.valeur)}
-            >
-              {f.libelle}
-            </button>
+            <option key={f.valeur} value={f.valeur}>{f.libelle}</option>
           ))}
-        </div>
+        </select>
+      </div>
 
-        {chargement && <Chargement lignes={5} />}
-        {erreur && <Message ton="erreur">{erreur}</Message>}
+      {chargement && <Chargement lignes={6} />}
+      {erreur && <Avis ton="erreur">{erreur}</Avis>}
 
-        {donnees && donnees.length === 0 && (
-          <Vide icone="👥">
-            {recherche
-              ? "Aucun élève ne correspond à cette recherche."
-              : "Aucun élève pour l'instant."}
-          </Vide>
-        )}
-
-        {donnees && donnees.length > 0 && (
-          <Carte>
-            <div className="liste">
+      {donnees && (
+        <Bloc sansPadding>
+          {donnees.length === 0 ? (
+            <Desert glyphe="◲">
+              {recherche
+                ? "Aucun élève ne correspond à cette recherche."
+                : "Aucun élève pour l'instant."}
+            </Desert>
+          ) : (
+            <Grille
+              colonnes={[
+                { cle: "eleve", libelle: "Élève" },
+                { cle: "statut", libelle: "Statut" },
+                { cle: "cat", libelle: "Catégorie" },
+                { cle: "frais", libelle: "Frais", droite: true },
+                { cle: "fiche", libelle: "Fiche", droite: true },
+              ]}
+            >
               {donnees.map((e) => (
-                <Link
-                  key={e.id}
-                  to={`/eleves/${e.id}`}
-                  className="ligne"
-                  style={{ textDecoration: "none", color: "inherit" }}
-                >
-                  <Initiales nom={e.nom} prenoms={e.prenoms} />
-                  <div className="corps">
-                    <div className="principal">{e.prenoms} {e.nom}</div>
-                    <div className="secondaire">
-                      {e.matricule} · Permis {e.categorie}
+                <tr key={e.id}>
+                  <td>
+                    <div className="nom-primaire">{e.prenoms} {e.nom}</div>
+                    <div className="nom-secondaire">
+                      {e.matricule} · {e.telephone}
+                      {e.commune ? ` · ${e.commune}` : ""}
                     </div>
-                  </div>
-                  <div className="droite">
-                    <BadgeStatutEleve statut={e.statut} />
-                    <div className="faible">{fFCFA(e.montantTotal)}</div>
-                  </div>
-                </Link>
+                  </td>
+                  <td><JetonStatutEleve statut={e.statut} /></td>
+                  <td className="num">Permis {e.categorie}</td>
+                  <td className="num droite">{fFCFA(e.montantTotal)}</td>
+                  <td className="droite">
+                    <Link to={`/eleves/${e.id}`} className="lien-fiche">Ouvrir</Link>
+                  </td>
+                </tr>
               ))}
-            </div>
-          </Carte>
-        )}
-      </main>
+            </Grille>
+          )}
+        </Bloc>
+      )}
 
-      {ouvrirFormulaire && (
-        <FormulaireInscription
-          onFermer={() => setOuvrirFormulaire(false)}
+      {creation && (
+        <VoletInscription
+          onFermer={() => setCreation(false)}
           onCree={(eleve, lien) => {
-            setOuvrirFormulaire(false);
-            setNouveauLien({ eleve, lien });
+            setCreation(false);
+            setNouveau({ eleve, lien });
             recharger();
           }}
         />
       )}
 
-      {nouveauLien && (
-        <Feuille titre="Élève inscrit" onFermer={() => setNouveauLien(null)}>
-          <Message ton="succes">
-            {nouveauLien.eleve.prenoms} {nouveauLien.eleve.nom} — matricule{" "}
-            <strong>{nouveauLien.eleve.matricule}</strong>
-          </Message>
-          <p className="doux" style={{ marginTop: 12 }}>
-            Envoyez-lui son lien de suivi personnel. Il y consultera sa
+      {nouveau && (
+        <Volet titre="Élève inscrit" onFermer={() => setNouveau(null)}>
+          <Avis ton="succes">
+            {nouveau.eleve.prenoms} {nouveau.eleve.nom} — matricule{" "}
+            <strong className="mono">{nouveau.eleve.matricule}</strong>
+          </Avis>
+          <p className="faible" style={{ marginTop: 14 }}>
+            Transmettez-lui son lien de suivi personnel. Il y consultera sa
             progression, ses séances et son solde, sans rien installer.
           </p>
-          <input readOnly value={nouveauLien.lien} onFocus={(e) => e.target.select()} />
+          <input readOnly value={nouveau.lien} onFocus={(e) => e.target.select()} />
           <div className="actions" style={{ marginTop: 12 }}>
             <a
               className="bouton"
               href={lienWhatsApp(
-                nouveauLien.eleve.telephone,
-                `Bonjour ${nouveauLien.eleve.prenoms}, voici votre espace personnel de suivi : ${nouveauLien.lien}`,
+                nouveau.eleve.telephone,
+                `Bonjour ${nouveau.eleve.prenoms}, voici votre espace personnel de suivi : ${nouveau.lien}`,
               )}
               target="_blank"
               rel="noreferrer"
             >
               Envoyer par WhatsApp
             </a>
-            <button
-              type="button"
-              className="bouton doux"
-              onClick={() => setNouveauLien(null)}
-            >
+            <button type="button" className="bouton doux" onClick={() => setNouveau(null)}>
               Fermer
             </button>
           </div>
-        </Feuille>
+        </Volet>
       )}
-    </>
+    </Atelier>
   );
 }
 
-function FormulaireInscription({
+function VoletInscription({
   onFermer, onCree,
 }: { onFermer: () => void; onCree: (eleve: Eleve, lien: string) => void }) {
   const { envoi, erreur, executer } = useEnvoi();
@@ -176,13 +178,12 @@ function FormulaireInscription({
         nom, prenoms, telephone, telephoneTuteur, cni, commune, categorie,
         montantTotal: Number(montantTotal) || 0,
       });
-      const lien = lienPortail(eleve.portailJeton ?? "");
-      onCree(eleve, lien);
+      onCree(eleve, lienPortail(eleve.portailJeton ?? ""));
     });
   }
 
   return (
-    <Feuille titre="Inscrire un élève" onFermer={onFermer}>
+    <Volet titre="Inscrire un élève" onFermer={onFermer}>
       <form onSubmit={soumettre}>
         <Champ etiquette="Nom">
           <input value={nom} onChange={(e) => setNom(e.target.value)} required maxLength={120} />
@@ -210,7 +211,7 @@ function FormulaireInscription({
           <input value={cni} onChange={(e) => setCni(e.target.value)} maxLength={40} />
         </Champ>
         <Champ etiquette="Commune">
-          <input value={commune} onChange={(e) => setCommune(e.target.value)} maxLength={120} />
+          <input value={commune} onChange={(e) => setCommune(e.target.value)} maxLength={120} placeholder="Yopougon" />
         </Champ>
         <Champ etiquette="Catégorie de permis">
           <select value={categorie} onChange={(e) => setCategorie(e.target.value as Categorie)}>
@@ -220,7 +221,7 @@ function FormulaireInscription({
           </select>
         </Champ>
         <Champ
-          etiquette="Montant de la formation (FCFA)"
+          etiquette="Frais de formation (FCFA)"
           aide="Laisser vide pour reprendre le tarif de la catégorie."
         >
           <input
@@ -231,7 +232,7 @@ function FormulaireInscription({
           />
         </Champ>
 
-        {erreur && <Message ton="erreur">{erreur}</Message>}
+        {erreur && <Avis ton="erreur">{erreur}</Avis>}
 
         <div className="actions" style={{ marginTop: 14 }}>
           <button type="button" className="bouton doux" onClick={onFermer}>Annuler</button>
@@ -240,6 +241,7 @@ function FormulaireInscription({
           </button>
         </div>
       </form>
-    </Feuille>
+    </Volet>
   );
 }
+

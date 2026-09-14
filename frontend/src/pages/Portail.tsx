@@ -1,9 +1,10 @@
 /** Portail élève : consultation de son propre dossier, sans installation.
  *
  * L'élève arrive par un lien WhatsApp contenant son jeton. On l'échange
- * aussitôt contre un jeton de session, puis on nettoie l'URL pour que le
+ * aussitôt contre un jeton de session, puis on nettoie l'adresse pour que le
  * jeton ne traîne ni dans l'historique du navigateur ni dans un partage
- * d'écran.
+ * d'écran. Présentation volontairement plus simple que l'espace de gestion :
+ * l'élève ouvre la page sur son téléphone, une fois de temps en temps.
  */
 
 import { useEffect, useState } from "react";
@@ -11,7 +12,7 @@ import { useNavigate, useParams } from "react-router-dom";
 
 import { api } from "../api";
 import {
-  BadgeStatutEleve, BadgeStatutSeance, Carte, Chargement, Jauge, Message, Vide,
+  Avis, Barre, Bloc, Chargement, Desert, Grille, JetonStatutEleve, JetonStatutSeance,
 } from "../components/ui";
 import {
   LIBELLE_MOYEN, LIBELLE_RESULTAT, LIBELLE_TYPE_SEANCE,
@@ -26,23 +27,22 @@ export default function Portail() {
   const navigate = useNavigate();
   const { session, connecterPortail, deconnecter } = useSession();
   const [erreurLien, setErreurLien] = useState<string | null>(null);
-  const [echangeEnCours, setEchangeEnCours] = useState(Boolean(jeton));
+  const [echange, setEchange] = useState(Boolean(jeton));
 
   useEffect(() => {
     if (!jeton) return;
     let annule = false;
     connecterPortail(jeton)
       .then(() => {
-        if (annule) return;
-        // On remplace l'entrée d'historique : le jeton disparaît de l'URL.
-        navigate("/portail", { replace: true });
+        // On remplace l'entrée d'historique : le jeton disparaît de l'adresse.
+        if (!annule) navigate("/portail", { replace: true });
       })
       .catch(() => {
-        if (!annule) setErreurLien("Ce lien n'est plus valide. Demandez-en un nouveau à votre auto-école.");
+        if (!annule) {
+          setErreurLien("Ce lien n'est plus valide. Demandez-en un nouveau à votre auto-école.");
+        }
       })
-      .finally(() => {
-        if (!annule) setEchangeEnCours(false);
-      });
+      .finally(() => { if (!annule) setEchange(false); });
     return () => { annule = true; };
   }, [jeton, connecterPortail, navigate]);
 
@@ -52,17 +52,21 @@ export default function Portail() {
     [connecte],
   );
 
-  if (echangeEnCours) {
-    return <div className="pleine-page"><p className="doux centre">Ouverture de votre espace…</p></div>;
+  if (echange) {
+    return (
+      <div style={{ display: "grid", placeItems: "center", minHeight: "100vh" }}>
+        <p className="faible">Ouverture de votre espace…</p>
+      </div>
+    );
   }
 
   if (erreurLien || (!connecte && !jeton)) {
     return (
-      <div className="pleine-page">
-        <div className="carte centre">
-          <div style={{ fontSize: 36 }} aria-hidden="true">🔑</div>
-          <h1 style={{ fontSize: 19, marginTop: 8 }}>Espace élève</h1>
-          <p className="doux" style={{ marginTop: 8 }}>
+      <div style={{ display: "grid", placeItems: "center", minHeight: "100vh", padding: 20 }}>
+        <div className="bloc" style={{ padding: 26, maxWidth: 400, textAlign: "center" }}>
+          <div className="sur-titre">Espace élève</div>
+          <h1 style={{ fontSize: 19, marginTop: 8 }}>Go Permis 225</h1>
+          <p className="faible" style={{ marginTop: 10 }}>
             {erreurLien ??
               "Ouvrez le lien personnel que votre auto-école vous a envoyé par WhatsApp."}
           </p>
@@ -72,172 +76,191 @@ export default function Portail() {
   }
 
   return (
-    <div className="app" style={{ paddingBottom: 24 }}>
-      <header className="entete">
-        <div style={{ flex: 1, minWidth: 0 }}>
+    <div style={{ maxWidth: 780, margin: "0 auto", padding: "18px 16px 40px" }}>
+      <header className="ligne-flex espace" style={{ marginBottom: 16 }}>
+        <div>
+          <div className="sur-titre">Espace élève</div>
           <h1>{donnees?.ecole.nom ?? "Mon suivi"}</h1>
-          <div className="sous">Espace élève</div>
         </div>
-        <button type="button" className="bouton doux petit" onClick={deconnecter}>Quitter</button>
+        <button type="button" className="bouton doux" onClick={deconnecter}>Quitter</button>
       </header>
 
-      <main className="contenu">
-        {chargement && <Chargement lignes={4} />}
-        {erreur && <Message ton="erreur">{erreur}</Message>}
+      {chargement && <Chargement lignes={4} />}
+      {erreur && <Avis ton="erreur">{erreur}</Avis>}
 
-        {donnees && (
-          <>
-            <Carte>
-              <h2>{donnees.eleve.prenoms} {donnees.eleve.nom}</h2>
-              <div className="doux">
-                {donnees.eleve.matricule} · Permis {donnees.eleve.categorie}
+      {donnees && (
+        <div style={{ display: "grid", gap: 12 }}>
+          <Bloc>
+            <div className="ligne-flex espace">
+              <div>
+                <h2>{donnees.eleve.prenoms} {donnees.eleve.nom}</h2>
+                <div className="mono faible">
+                  {donnees.eleve.matricule} · Permis {donnees.eleve.categorie}
+                </div>
               </div>
-              <div style={{ marginTop: 8 }}>
-                <BadgeStatutEleve statut={donnees.eleve.statut} />
-              </div>
-            </Carte>
+              <JetonStatutEleve statut={donnees.eleve.statut} />
+            </div>
+          </Bloc>
 
-            <Carte titre="Ma progression">
-              <div className="rangee espace" style={{ marginBottom: 6 }}>
-                <strong>{donnees.progression.pourcentage} % du parcours</strong>
-                {donnees.progression.pretPourExamen && (
-                  <span className="badge vert">Prêt pour l'examen</span>
-                )}
-              </div>
-              <Jauge pourcentage={donnees.progression.pourcentage} />
-              <div className="grille-3" style={{ marginTop: 12 }}>
-                <div>
-                  <div className="faible">Code</div>
-                  <strong className="nombre">
-                    {donnees.progression.heuresCodeFaites} / {donnees.progression.heuresCodePrevues} h
-                  </strong>
-                </div>
-                <div>
-                  <div className="faible">Conduite</div>
-                  <strong className="nombre">
-                    {donnees.progression.heuresConduiteFaites} / {donnees.progression.heuresConduitePrevues} h
-                  </strong>
-                </div>
-                <div>
-                  <div className="faible">Permis</div>
-                  <strong style={{ fontSize: 13 }}>
-                    {donnees.eleve.datePermis ? fDate(donnees.eleve.datePermis) : "En cours"}
-                  </strong>
-                </div>
-              </div>
-              <div className="rangee" style={{ gap: 14, marginTop: 12 }}>
-                <span className="doux">
-                  Examen code : <strong>{LIBELLE_RESULTAT[donnees.eleve.resultatCode]}</strong>
+          <Bloc titre="Ma progression">
+            <LigneProgression
+              libelle="Conduite"
+              fait={donnees.progression.heuresConduiteFaites}
+              prevu={donnees.progression.heuresConduitePrevues}
+            />
+            <LigneProgression
+              libelle="Code"
+              fait={donnees.progression.heuresCodeFaites}
+              prevu={donnees.progression.heuresCodePrevues}
+            />
+            <div className="ligne-flex" style={{ gap: 16, marginTop: 10, flexWrap: "wrap" }}>
+              <span className="faible">
+                Examen code : <strong>{LIBELLE_RESULTAT[donnees.eleve.resultatCode]}</strong>
+              </span>
+              <span className="faible">
+                Conduite : <strong>{LIBELLE_RESULTAT[donnees.eleve.resultatConduite]}</strong>
+              </span>
+              {donnees.eleve.datePermis && (
+                <span className="faible">
+                  Permis obtenu le <strong>{fDate(donnees.eleve.datePermis)}</strong>
                 </span>
-                <span className="doux">
-                  Conduite : <strong>{LIBELLE_RESULTAT[donnees.eleve.resultatConduite]}</strong>
-                </span>
-              </div>
-            </Carte>
+              )}
+            </div>
+            {donnees.progression.pretPourExamen && (
+              <Avis ton="succes">
+                Vos heures sont terminées — vous pouvez être présenté à l'examen.
+              </Avis>
+            )}
+          </Bloc>
 
-            <Carte titre="Mon solde">
-              <div className="rangee espace">
-                <span className="doux">Montant de la formation</span>
-                <strong className="nombre">{fFCFA(donnees.solde.montantTotal)}</strong>
+          <Bloc titre="Mon solde">
+            <div className="ligne-flex espace">
+              <div>
+                <div className="faible">Frais de formation</div>
+                <div className="mono" style={{ fontSize: 17, fontWeight: 600 }}>
+                  {fFCFA(donnees.solde.montantTotal)}
+                </div>
               </div>
-              <div className="rangee espace">
-                <span className="doux">Déjà versé</span>
-                <strong className="nombre" style={{ color: "var(--vert)" }}>
+              <div>
+                <div className="faible">Déjà versé</div>
+                <div className="mono" style={{ fontSize: 17, fontWeight: 600, color: "var(--vert)" }}>
                   {fFCFA(donnees.solde.totalPaye)}
-                </strong>
+                </div>
               </div>
-              <div
-                className="rangee espace"
-                style={{ borderTop: "1px solid var(--bordure)", marginTop: 8, paddingTop: 8 }}
-              >
-                <strong>Reste à payer</strong>
-                <strong
-                  className="nombre"
-                  style={{ color: donnees.solde.reste > 0 ? "var(--orange)" : "var(--vert)" }}
+              <div style={{ textAlign: "right" }}>
+                <div className="faible">Reste à payer</div>
+                <div
+                  className="mono"
+                  style={{
+                    fontSize: 17, fontWeight: 600,
+                    color: donnees.solde.reste > 0 ? "var(--orange)" : "var(--vert)",
+                  }}
                 >
                   {fFCFA(donnees.solde.reste)}
-                </strong>
+                </div>
               </div>
-              {donnees.ecole.telephone && donnees.solde.reste > 0 && (
-                <a
-                  className="bouton doux large"
-                  style={{ marginTop: 10 }}
-                  href={`tel:${donnees.ecole.telephone}`}
+            </div>
+            {donnees.ecole.telephone && donnees.solde.reste > 0 && (
+              <a className="bouton doux large" style={{ marginTop: 12 }} href={`tel:${donnees.ecole.telephone}`}>
+                Appeler l'auto-école
+              </a>
+            )}
+          </Bloc>
+
+          <Bloc titre="Mes prochaines séances" sansPadding>
+            {(() => {
+              const prochaines = donnees.seances.filter(
+                (s) => s.statut === "planifiee" && new Date(s.debut) >= new Date(),
+              );
+              if (prochaines.length === 0) {
+                return <Desert glyphe="◰">Aucune séance planifiée pour le moment.</Desert>;
+              }
+              return (
+                <Grille
+                  colonnes={[
+                    { cle: "quand", libelle: "Date" },
+                    { cle: "type", libelle: "Type" },
+                    { cle: "mon", libelle: "Moniteur" },
+                    { cle: "lieu", libelle: "Rendez-vous" },
+                  ]}
                 >
-                  Appeler l'auto-école
-                </a>
-              )}
-            </Carte>
-
-            <Carte titre="Mes prochaines séances">
-              {(() => {
-                const prochaines = donnees.seances.filter(
-                  (s) => s.statut === "planifiee" && new Date(s.debut) >= new Date(),
-                );
-                if (prochaines.length === 0) {
-                  return <Vide icone="📅">Aucune séance planifiée pour le moment.</Vide>;
-                }
-                return (
-                  <div className="liste">
-                    {prochaines.map((s) => (
-                      <div key={s.id} className="ligne" style={{ cursor: "default" }}>
-                        <div className="corps">
-                          <div className="principal">{fDateHeure(s.debut)}</div>
-                          <div className="secondaire">
-                            {LIBELLE_TYPE_SEANCE[s.type]} · {fDuree(s.debut, s.fin)}
-                            {s.moniteur ? ` · ${s.moniteur}` : ""}
-                          </div>
-                          {s.lieu && <div className="faible">Rendez-vous : {s.lieu}</div>}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                );
-              })()}
-            </Carte>
-
-            <Carte titre="Historique des séances">
-              {donnees.seances.length === 0 ? (
-                <p className="doux">Aucune séance enregistrée.</p>
-              ) : (
-                <div className="liste">
-                  {donnees.seances.slice().reverse().slice(0, 20).map((s) => (
-                    <div key={s.id} className="ligne" style={{ cursor: "default" }}>
-                      <div className="corps">
-                        <div className="principal">
-                          {LIBELLE_TYPE_SEANCE[s.type]} · {fDuree(s.debut, s.fin)}
-                        </div>
-                        <div className="secondaire">{fDateHeure(s.debut)}</div>
-                      </div>
-                      <div className="droite"><BadgeStatutSeance statut={s.statut} /></div>
-                    </div>
+                  {prochaines.map((s) => (
+                    <tr key={s.id}>
+                      <td className="num">{fDateHeure(s.debut)}</td>
+                      <td>{LIBELLE_TYPE_SEANCE[s.type]} · {fDuree(s.debut, s.fin)}</td>
+                      <td>{s.moniteur || "—"}</td>
+                      <td className="faible">{s.lieu || "—"}</td>
+                    </tr>
                   ))}
-                </div>
-              )}
-            </Carte>
+                </Grille>
+              );
+            })()}
+          </Bloc>
 
-            <Carte titre="Mes versements">
-              {donnees.paiements.length === 0 ? (
-                <p className="doux">Aucun versement enregistré.</p>
-              ) : (
-                <div className="liste">
-                  {donnees.paiements.map((p) => (
-                    <div key={p.numeroRecu} className="ligne" style={{ cursor: "default" }}>
-                      <div className="corps">
-                        <div className="principal">{fFCFA(p.montant)}</div>
-                        <div className="secondaire">
-                          {fDate(p.date)} · {LIBELLE_MOYEN[p.moyen]}
-                        </div>
-                      </div>
-                      <div className="droite faible">{p.numeroRecu}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </Carte>
-          </>
-        )}
-      </main>
+          <Bloc titre="Historique des séances" sansPadding>
+            {donnees.seances.length === 0 ? (
+              <Desert glyphe="◰">Aucune séance enregistrée.</Desert>
+            ) : (
+              <Grille
+                colonnes={[
+                  { cle: "quand", libelle: "Date" },
+                  { cle: "type", libelle: "Type" },
+                  { cle: "duree", libelle: "Durée" },
+                  { cle: "statut", libelle: "Statut", droite: true },
+                ]}
+              >
+                {donnees.seances.slice().reverse().slice(0, 20).map((s) => (
+                  <tr key={s.id}>
+                    <td className="num">{fDateHeure(s.debut)}</td>
+                    <td>{LIBELLE_TYPE_SEANCE[s.type]}</td>
+                    <td className="num">{fDuree(s.debut, s.fin)}</td>
+                    <td className="droite"><JetonStatutSeance statut={s.statut} /></td>
+                  </tr>
+                ))}
+              </Grille>
+            )}
+          </Bloc>
+
+          <Bloc titre="Mes versements" sansPadding>
+            {donnees.paiements.length === 0 ? (
+              <Desert glyphe="◳">Aucun versement enregistré.</Desert>
+            ) : (
+              <Grille
+                colonnes={[
+                  { cle: "recu", libelle: "Reçu" },
+                  { cle: "date", libelle: "Date" },
+                  { cle: "moyen", libelle: "Moyen" },
+                  { cle: "montant", libelle: "Montant", droite: true },
+                ]}
+              >
+                {donnees.paiements.map((p) => (
+                  <tr key={p.numeroRecu}>
+                    <td className="num">{p.numeroRecu}</td>
+                    <td className="num">{fDate(p.date)}</td>
+                    <td><span className="jeton orange">{LIBELLE_MOYEN[p.moyen]}</span></td>
+                    <td className="num droite">{fFCFA(p.montant)}</td>
+                  </tr>
+                ))}
+              </Grille>
+            )}
+          </Bloc>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LigneProgression({
+  libelle, fait, prevu,
+}: { libelle: string; fait: number; prevu: number }) {
+  const pct = prevu === 0 ? 100 : Math.min(100, Math.round((fait / prevu) * 100));
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <div className="ligne-flex espace" style={{ marginBottom: 4 }}>
+        <span className="faible">{libelle} · {fait}/{prevu} h</span>
+        <span className="mono faible">{pct} %</span>
+      </div>
+      <Barre pourcentage={pct} />
     </div>
   );
 }

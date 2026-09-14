@@ -1,91 +1,100 @@
-/** Personnel : moniteurs et secrétaires. Réservé au directeur. */
+/** Personnel : moniteurs et secrétariat. Réservé au directeur. */
 
 import { useState } from "react";
-import { Link } from "react-router-dom";
 
 import { api } from "../api";
-import { Badge, Carte, Champ, Chargement, Feuille, Message, Vide } from "../components/ui";
+import { Atelier } from "../components/Atelier";
+import {
+  Avis, Bloc, Champ, Chargement, Desert, Grille, Jeton, Volet,
+} from "../components/ui";
 import { fFCFA } from "../format";
 import { useChargement, useEnvoi } from "../hooks";
 import type { Role, Utilisateur } from "../types";
 
 const LIBELLE_ROLE: Record<Role, string> = {
   directeur: "Directeur",
-  secretaire: "Secrétaire",
+  secretaire: "Secrétariat",
   moniteur: "Moniteur",
 };
 
-export default function Personnel() {
-  const [ouvrirCreation, setOuvrirCreation] = useState(false);
+export default function Moniteurs() {
+  const [creation, setCreation] = useState(false);
   const [fiche, setFiche] = useState<Utilisateur | null>(null);
   const { donnees, chargement, erreur, recharger } = useChargement<Utilisateur[]>(
     () => api.get<Utilisateur[]>("/api/personnel"), [],
   );
 
   return (
-    <>
-      <header className="entete">
-        <h1>Personnel</h1>
-        <button type="button" className="bouton petit" onClick={() => setOuvrirCreation(true)}>
-          + Ajouter
+    <Atelier
+      titre="Moniteurs et personnel"
+      sous={donnees ? `${donnees.length} collaborateur(s)` : undefined}
+      outils={
+        <button type="button" className="bouton" onClick={() => setCreation(true)}>
+          Ajouter un collaborateur
         </button>
-      </header>
+      }
+    >
+      {chargement && <Chargement lignes={4} />}
+      {erreur && <Avis ton="erreur">{erreur}</Avis>}
 
-      <main className="contenu">
-        {chargement && <Chargement lignes={3} />}
-        {erreur && <Message ton="erreur">{erreur}</Message>}
-        {donnees?.length === 0 && <Vide icone="👨‍🏫">Aucun collaborateur.</Vide>}
-
-        {donnees && donnees.length > 0 && (
-          <Carte>
-            <div className="liste">
+      {donnees && (
+        <Bloc sansPadding>
+          {donnees.length === 0 ? (
+            <Desert glyphe="◵">Aucun collaborateur enregistré.</Desert>
+          ) : (
+            <Grille
+              colonnes={[
+                { cle: "nom", libelle: "Collaborateur" },
+                { cle: "role", libelle: "Rôle" },
+                { cle: "tarif", libelle: "Tarif horaire", droite: true },
+                { cle: "etat", libelle: "État", droite: true },
+                { cle: "act", libelle: "Fiche", droite: true },
+              ]}
+            >
               {donnees.map((u) => (
-                <button key={u.id} type="button" className="ligne" onClick={() => setFiche(u)}>
-                  <div className="corps">
-                    <div className="principal">{u.nom}</div>
-                    <div className="secondaire">
-                      {LIBELLE_ROLE[u.role]} · {u.telephone}
-                    </div>
-                  </div>
-                  <div className="droite">
-                    {u.actif ? <Badge ton="vert">Actif</Badge> : <Badge ton="rouge">Désactivé</Badge>}
-                    {u.role === "moniteur" && (u.tarifHoraire ?? 0) > 0 && (
-                      <div className="faible">{fFCFA(u.tarifHoraire ?? 0)}/h</div>
-                    )}
-                  </div>
-                </button>
+                <tr key={u.id}>
+                  <td>
+                    <div className="nom-primaire">{u.nom}</div>
+                    <div className="nom-secondaire">{u.telephone}</div>
+                  </td>
+                  <td>{LIBELLE_ROLE[u.role]}</td>
+                  <td className="num droite">
+                    {u.role === "moniteur" ? fFCFA(u.tarifHoraire ?? 0) : "—"}
+                  </td>
+                  <td className="droite">
+                    {u.actif ? <Jeton ton="vert">Actif</Jeton> : <Jeton ton="rouge">Désactivé</Jeton>}
+                  </td>
+                  <td className="droite">
+                    <button type="button" className="bouton nu" onClick={() => setFiche(u)}>
+                      Ouvrir
+                    </button>
+                  </td>
+                </tr>
               ))}
-            </div>
-          </Carte>
-        )}
+            </Grille>
+          )}
+        </Bloc>
+      )}
 
-        <p className="centre">
-          <Link to="/vehicules" className="doux">Gérer le parc automobile →</Link>
-        </p>
-        <p className="centre">
-          <Link to="/" className="doux">← Tableau de bord</Link>
-        </p>
-      </main>
-
-      {ouvrirCreation && (
-        <FeuilleCreation
-          onFermer={() => setOuvrirCreation(false)}
-          onCree={() => { setOuvrirCreation(false); recharger(); }}
+      {creation && (
+        <VoletCreation
+          onFermer={() => setCreation(false)}
+          onCree={() => { setCreation(false); recharger(); }}
         />
       )}
 
       {fiche && (
-        <FeuilleFiche
+        <VoletFiche
           agent={fiche}
           onFermer={() => setFiche(null)}
           onModifie={() => { setFiche(null); recharger(); }}
         />
       )}
-    </>
+    </Atelier>
   );
 }
 
-function FeuilleCreation({ onFermer, onCree }: { onFermer: () => void; onCree: () => void }) {
+function VoletCreation({ onFermer, onCree }: { onFermer: () => void; onCree: () => void }) {
   const { envoi, erreur, executer } = useEnvoi();
   const [nom, setNom] = useState("");
   const [telephone, setTelephone] = useState("");
@@ -99,15 +108,14 @@ function FeuilleCreation({ onFermer, onCree }: { onFermer: () => void; onCree: (
     const ok = await executer(async () => {
       await api.post("/api/personnel", {
         nom, telephone, role, motDePasse,
-        tarifHoraire: Number(tarifHoraire) || 0,
-        permisEnseigner,
+        tarifHoraire: Number(tarifHoraire) || 0, permisEnseigner,
       });
     });
     if (ok) onCree();
   }
 
   return (
-    <Feuille titre="Ajouter un collaborateur" onFermer={onFermer}>
+    <Volet titre="Ajouter un collaborateur" onFermer={onFermer}>
       <form onSubmit={soumettre}>
         <Champ etiquette="Nom complet">
           <input value={nom} onChange={(e) => setNom(e.target.value)} required maxLength={120} />
@@ -124,7 +132,7 @@ function FeuilleCreation({ onFermer, onCree }: { onFermer: () => void; onCree: (
         <Champ etiquette="Rôle">
           <select value={role} onChange={(e) => setRole(e.target.value as Role)}>
             <option value="moniteur">Moniteur</option>
-            <option value="secretaire">Secrétaire</option>
+            <option value="secretaire">Secrétariat</option>
             <option value="directeur">Directeur</option>
           </select>
         </Champ>
@@ -140,7 +148,7 @@ function FeuilleCreation({ onFermer, onCree }: { onFermer: () => void; onCree: (
         </Champ>
         {role === "moniteur" && (
           <>
-            <Champ etiquette="Tarif horaire (FCFA)" aide="Sert au calcul automatique du salaire.">
+            <Champ etiquette="Tarif horaire (FCFA)" aide="Sert au calcul automatique de la paie.">
               <input
                 value={tarifHoraire}
                 onChange={(e) => setTarifHoraire(e.target.value.replace(/\D/g, ""))}
@@ -158,7 +166,7 @@ function FeuilleCreation({ onFermer, onCree }: { onFermer: () => void; onCree: (
           </>
         )}
 
-        {erreur && <Message ton="erreur">{erreur}</Message>}
+        {erreur && <Avis ton="erreur">{erreur}</Avis>}
 
         <div className="actions" style={{ marginTop: 14 }}>
           <button type="button" className="bouton doux" onClick={onFermer}>Annuler</button>
@@ -167,11 +175,11 @@ function FeuilleCreation({ onFermer, onCree }: { onFermer: () => void; onCree: (
           </button>
         </div>
       </form>
-    </Feuille>
+    </Volet>
   );
 }
 
-function FeuilleFiche({
+function VoletFiche({
   agent, onFermer, onModifie,
 }: { agent: Utilisateur; onFermer: () => void; onModifie: () => void }) {
   const { envoi, erreur, executer } = useEnvoi();
@@ -184,25 +192,24 @@ function FeuilleFiche({
   );
 
   return (
-    <Feuille titre={agent.nom} onFermer={onFermer}>
-      <p className="doux">
-        {LIBELLE_ROLE[agent.role]} · {agent.telephone}
-      </p>
+    <Volet titre={agent.nom} onFermer={onFermer}>
+      <p className="faible">{LIBELLE_ROLE[agent.role]} · {agent.telephone}</p>
 
       {agent.role === "moniteur" && salaire.donnees && (
-        <Carte titre="Ce mois">
-          <div className="rangee espace">
-            <span className="doux">Heures effectuées</span>
-            <strong className="nombre">{salaire.donnees.heures} h</strong>
+        <Bloc titre="Heures et rémunération">
+          <div className="ligne-flex espace">
+            <span className="faible">Heures effectuées</span>
+            <strong className="mono">{salaire.donnees.heures} h</strong>
           </div>
-          <div className="rangee espace">
-            <span className="doux">Rémunération</span>
-            <strong className="nombre">{fFCFA(salaire.donnees.montant)}</strong>
+          <div className="ligne-flex espace">
+            <span className="faible">Rémunération due</span>
+            <strong className="mono">{fFCFA(salaire.donnees.montant)}</strong>
           </div>
-          <p className="faible" style={{ marginTop: 6 }}>
+          <p className="faible" style={{ marginTop: 8 }}>
             Calcul : heures des séances marquées « effectuée » × tarif horaire.
+            Une séance planifiée ou annulée n'est jamais comptée.
           </p>
-        </Carte>
+        </Bloc>
       )}
 
       {agent.role === "moniteur" && (
@@ -225,7 +232,7 @@ function FeuilleFiche({
         />
       </Champ>
 
-      {erreur && <Message ton="erreur">{erreur}</Message>}
+      {erreur && <Avis ton="erreur">{erreur}</Avis>}
 
       <div className="actions" style={{ marginTop: 14 }}>
         <button
@@ -253,9 +260,7 @@ function FeuilleFiche({
                 });
               }
               if (nouveauMdp) {
-                await api.post(`/api/personnel/${agent.id}/mot-de-passe`, {
-                  motDePasse: nouveauMdp,
-                });
+                await api.post(`/api/personnel/${agent.id}/mot-de-passe`, { motDePasse: nouveauMdp });
               }
             });
             if (ok) onModifie();
@@ -264,6 +269,6 @@ function FeuilleFiche({
           {envoi ? "Enregistrement…" : "Enregistrer"}
         </button>
       </div>
-    </Feuille>
+    </Volet>
   );
 }
