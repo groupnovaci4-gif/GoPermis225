@@ -96,6 +96,17 @@ export const LIBELLE_CATEGORIE: Record<Categorie, string> = {
   E: "E — Remorques",
 };
 
+/** Lien personnel du portail élève, valable sous n'importe quel préfixe.
+ *
+ * On repart de l'adresse de la page courante — sans son ancre — pour que le
+ * lien reste juste que l'application soit servie à la racine ou derrière un
+ * proxy de chemin.
+ */
+export function lienPortail(jeton: string): string {
+  const { origin, pathname, search } = window.location;
+  return `${origin}${pathname}${search}#/portail/${jeton}`;
+}
+
 /** Message WhatsApp pré-rempli, ouvert via wa.me. */
 export function lienWhatsApp(telephone: string, message: string): string {
   const numero = telephone.replace(/\D/g, "");

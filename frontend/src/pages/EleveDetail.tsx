@@ -10,7 +10,7 @@ import {
 } from "../components/ui";
 import {
   LIBELLE_MOYEN, LIBELLE_RESULTAT, LIBELLE_STATUT_ELEVE, LIBELLE_TYPE_SEANCE,
-  aujourdhuiISO, fDate, fDateHeure, fDuree, fFCFA, lienWhatsApp,
+  aujourdhuiISO, fDate, fDateHeure, fDuree, fFCFA, lienPortail, lienWhatsApp,
 } from "../format";
 import { useChargement, useEnvoi } from "../hooks";
 import { useSession } from "../session";
@@ -306,7 +306,7 @@ export default function EleveDetail() {
                 const reponse = await api.post<{ portailJeton: string }>(
                   `/api/eleves/${donnees.eleve.id}/lien-portail`,
                 );
-                setLienGenere(`${window.location.origin}/portail/${reponse.portailJeton}`);
+                setLienGenere(lienPortail(reponse.portailJeton));
               }}
             >
               Générer un nouveau lien

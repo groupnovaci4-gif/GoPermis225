@@ -11,10 +11,12 @@ from __future__ import annotations
 
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from lib.config import ConfigurationInvalide, charger_config
 from lib.db import configurer_db, creer_index, fabrique_motor, obtenir_db
@@ -69,6 +71,26 @@ def creer_app(config=None) -> FastAPI:
     @app.get("/api/sante", tags=["technique"])
     async def sante() -> dict:
         return {"statut": "ok", "service": "go-permis-225"}
+
+    # L'interface construite, servie par le même serveur que l'API.
+    #
+    # Un seul port à exposer, une seule origine : plus de question de CORS, et
+    # surtout l'application fonctionne derrière un proxy de chemin (un aperçu
+    # d'hébergeur, un sous-dossier), car ses fichiers et ses appels d'API sont
+    # tous résolus relativement à la page.
+    #
+    # Ce montage vient APRÈS les routeurs : FastAPI teste les routes dans
+    # l'ordre d'ajout, donc « /api/… » est reconnu avant d'atteindre le
+    # montage racine.
+    interface = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+    if interface.is_dir():
+        app.mount("/", StaticFiles(directory=interface, html=True), name="interface")
+    else:
+        logger.info(
+            "Interface non construite (%s absent) : l'API seule est servie. "
+            "Lancer `yarn build` dans frontend/ pour la générer.",
+            interface,
+        )
 
     return app
 

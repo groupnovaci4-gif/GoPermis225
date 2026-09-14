@@ -39,11 +39,25 @@ Variables d'environnement — voir `backend/.env.example` :
 
 ### Frontend
 
+Deux façons de le lancer.
+
+**Pour développer** — rechargement à chaud, deux ports :
+
 ```bash
 cd frontend
 yarn install
 yarn dev        # http://localhost:5173, proxy /api vers le port 8000
 ```
+
+**Pour montrer ou déployer** — un seul port, et c'est la seule façon qui
+fonctionne derrière un proxy de chemin (aperçu d'hébergeur, sous-dossier) :
+
+```bash
+cd frontend && yarn install && yarn build
+```
+
+L'API sert alors `frontend/dist/` elle-même : tout est accessible sur le port
+du backend, sans CORS. Voir « Servir sous un préfixe » plus bas.
 
 ### Démonstration sans MongoDB
 
@@ -124,9 +138,22 @@ l'API directement. Tout ce qui compte est côté serveur.
 
 ## Déploiement
 
-Backend et frontend se déploient ensemble. Servir `frontend/dist/` et l'API
-derrière le même domaine supprime toute question de CORS ; sinon, renseigner
-`CORS_ORIGINS` et `VITE_API_URL`.
+Construire le frontend (`yarn build`) puis lancer le backend : l'API sert
+elle-même `frontend/dist/`. Un seul port à exposer, une seule origine, donc
+aucune question de CORS. Pour héberger le frontend séparément, renseigner
+`CORS_ORIGINS` côté backend et `VITE_API_URL` côté frontend.
 
-Le portail élève utilise des routes profondes (`/portail/<jeton>`) : configurer
-l'hébergeur pour renvoyer `index.html` sur toute route inconnue.
+### Servir sous un préfixe
+
+L'application fonctionne telle quelle à la racine d'un domaine **comme** sous
+un préfixe de chemin — `https://exemple.com/proxy/8000/`, un sous-dossier, un
+aperçu d'hébergeur. Trois choix rendent cela possible, à ne pas défaire :
+
+1. `base: "./"` dans `vite.config.ts` — les fichiers sont demandés en relatif ;
+2. `urlApi()` dans `src/api.ts` résout les appels contre `document.baseURI`
+   plutôt que par un chemin absolu `/api/…` ;
+3. le routage passe par `HashRouter` — les adresses vivent après un `#`, donc
+   elles survivent à n'importe quel préfixe **et** l'hébergeur n'a aucune règle
+   de réécriture à configurer.
+
+Un chemin absolu réintroduit ailleurs dans le code casserait les trois.

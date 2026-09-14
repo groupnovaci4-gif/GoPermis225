@@ -6,6 +6,17 @@
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
 
+/** Adresse complète d'un point d'entrée de l'API.
+ *
+ * Un chemin absolu « /api/… » perdrait le préfixe sous lequel l'application
+ * est servie (sous-dossier, proxy de chemin). On résout donc relativement à
+ * la base du document, ce qui fonctionne à la racine comme sous un préfixe.
+ */
+function urlApi(chemin: string): string {
+  if (BASE) return `${BASE}${chemin}`;
+  return new URL(chemin.replace(/^\//, ""), document.baseURI).toString();
+}
+
 export class ErreurApi extends Error {
   constructor(
     message: string,
@@ -61,7 +72,7 @@ function messageErreur(corps: unknown, statut: number): string {
 async function requete<T>(methode: Methode, chemin: string, corps?: unknown): Promise<T> {
   let reponse: Response;
   try {
-    reponse = await fetch(`${BASE}${chemin}`, {
+    reponse = await fetch(urlApi(chemin), {
       method: methode,
       headers: {
         ...(corps === undefined ? {} : { "Content-Type": "application/json" }),

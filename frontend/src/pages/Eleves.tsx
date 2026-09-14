@@ -7,7 +7,7 @@ import { api } from "../api";
 import {
   BadgeStatutEleve, Carte, Champ, Chargement, Feuille, Initiales, Message, Vide,
 } from "../components/ui";
-import { LIBELLE_CATEGORIE, fFCFA, lienWhatsApp } from "../format";
+import { LIBELLE_CATEGORIE, fFCFA, lienPortail, lienWhatsApp } from "../format";
 import { useChargement, useEnvoi } from "../hooks";
 import { useSession } from "../session";
 import type { Categorie, Eleve, StatutEleve } from "../types";
@@ -176,7 +176,7 @@ function FormulaireInscription({
         nom, prenoms, telephone, telephoneTuteur, cni, commune, categorie,
         montantTotal: Number(montantTotal) || 0,
       });
-      const lien = `${window.location.origin}/portail/${eleve.portailJeton ?? ""}`;
+      const lien = lienPortail(eleve.portailJeton ?? "");
       onCree(eleve, lien);
     });
   }

@@ -108,6 +108,14 @@ backend/.venv/bin/python scripts/demo.py
     session, jamais du client.
 20. **Un directeur ne peut pas se désactiver** ni se retirer son rôle : l'école
     se retrouverait sans personne pour réactiver quoi que ce soit.
+21. **L'application ne suppose jamais être servie à la racine d'un domaine.**
+    Elle doit fonctionner sous un préfixe (`/proxy/8000/`, un sous-dossier, un
+    aperçu d'hébergeur). Trois choix le garantissent : `base: "./"` dans
+    `vite.config.ts`, `urlApi()` qui résout contre `document.baseURI`, et
+    `HashRouter`. **Ne jamais réintroduire un chemin absolu** — ni `/api/…`
+    dans une requête, ni `window.location.origin + "/route"` pour fabriquer un
+    lien : passer par `urlApi()` et `lienPortail()`. Une page blanche sous
+    préfixe est exactement le symptôme de cette erreur.
 
 ## 5. Reste à faire
 
