@@ -1,0 +1,24 @@
+# Dépendances — reconstructibles avec `yarn install` / `pip install`
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Secrets — ne doivent JAMAIS entrer dans Git
+.env
+.env.*
+!.env.example
+
+# Constructions et caches
+dist/
+build/
+web-build/
+.vite/
+.ruff_cache/
+.pytest_cache/
+*.log
+
+# Système
+.DS_Store
+Thumbs.db
