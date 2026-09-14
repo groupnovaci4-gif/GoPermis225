@@ -337,3 +337,33 @@ async def test_un_numero_de_telephone_invalide_est_refuse(client):
         json={"nom": "Test", "prenoms": "Essai", "telephone": "123"},
     )
     assert reponse.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_la_liste_des_eleves_porte_progression_et_solde(client):
+    """Sans cela, l'écran appellerait l'API une fois par élève."""
+    ecole = await inscrire(client)
+    eleve = await creer_eleve(client, ecole["jeton"], montant=100_000)
+    moniteur = await _moniteur(client, ecole["jeton"])
+
+    seance = await client.post(
+        "/api/seances", headers=entete(ecole["jeton"]),
+        json={"eleveId": eleve["id"], "moniteurId": moniteur["id"],
+              "debut": DEBUT.isoformat(), "fin": (DEBUT + timedelta(hours=2)).isoformat()},
+    )
+    await client.patch(
+        f"/api/seances/{seance.json()['id']}", headers=entete(ecole["jeton"]),
+        json={"statut": "effectuee"},
+    )
+    await client.post(
+        "/api/paiements", headers=entete(ecole["jeton"]),
+        json={"eleveId": eleve["id"], "montant": 40_000, "moyen": "wave", "clientOpId": "x"},
+    )
+
+    liste = await client.get("/api/eleves", headers=entete(ecole["jeton"]))
+    ligne = liste.json()[0]
+    assert ligne["progression"]["heuresConduiteFaites"] == 2
+    assert ligne["solde"]["reste"] == 60_000
+    assert ligne["solde"]["tauxRecouvrement"] == 40
+    # Le jeton de portail ne doit jamais apparaître dans une liste.
+    assert "portailJeton" not in ligne

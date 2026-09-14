@@ -79,9 +79,31 @@ async def lister_eleves(
             if besoin in f"{e.get('nom','')} {e.get('prenoms','')} {e.get('matricule','')} {e.get('telephone','')}".lower()
         ]
 
-    # Le jeton du portail ne sort jamais dans une liste : il vaut mot de passe.
+    # Progression et solde joints à la liste : sans cela, l'écran devrait
+    # appeler l'API une fois par élève pour afficher deux colonnes.
+    ids = {e["id"] for e in eleves}
+    seances_par_eleve: dict[str, list[dict]] = {}
+    for s in await lister(base, SEANCES, session, limite=20000):
+        if s.get("eleveId") in ids:
+            seances_par_eleve.setdefault(s["eleveId"], []).append(s)
+
+    paiements_par_eleve: dict[str, list[dict]] = {}
+    for p in await lister(base, PAIEMENTS, session, limite=20000):
+        if p.get("eleveId") in ids:
+            paiements_par_eleve.setdefault(p["eleveId"], []).append(p)
+
     for e in eleves:
+        # Le jeton du portail ne sort jamais dans une liste : il vaut mot de passe.
         e.pop("portailJeton", None)
+        e["progression"] = progression_eleve(
+            seances_par_eleve.get(e["id"], []),
+            code_prevues=int(e.get("heuresCodePrevues", 0)),
+            conduite_prevues=int(e.get("heuresConduitePrevues", 0)),
+        ).as_dict()
+        e["solde"] = solde_eleve(
+            int(e.get("montantTotal", 0)), paiements_par_eleve.get(e["id"], []),
+        ).as_dict()
+
     return eleves
 
 

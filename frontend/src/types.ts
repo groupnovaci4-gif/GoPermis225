@@ -65,6 +65,9 @@ export interface Eleve {
   resultatConduite: ResultatExamen;
   datePermis?: string | null;
   historiqueStatuts?: ChangementStatut[];
+  /** Joints par le serveur dans la liste, absents du détail. */
+  progression?: Progression;
+  solde?: Solde;
   /** Présent uniquement dans la réponse de création ou de régénération. */
   portailJeton?: string;
 }

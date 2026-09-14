@@ -83,7 +83,7 @@ async def semer() -> None:
     #  part réglée, jours depuis le dernier versement, mois depuis inscription)
     eleves = [
         ("Traoré", "Awa", "0555111111", "Yopougon", "B", 150000, "actif", 4, 0.50, 3, 2),
-        ("Koné", "Ibrahim", "0555222222", "Abobo", "B", 150000, "actif", 17, 1.00, 5, 5),
+        ("Koné", "Ibrahim", "0555222222", "Abobo", "B", 150000, "actif", 20, 1.00, 5, 5),
         ("Bamba", "Fatou", "0555333333", "Cocody", "B", 150000, "diplome", 20, 1.00, 60, 8),
         ("N'Guessan", "Serge", "0555444444", "Cocody", "B", 150000, "actif", 18, 1.00, 12, 6),
         ("Diomandé", "Mariam", "0555555555", "Koumassi", "B", 150000, "actif", 11, 0.50, 9, 4),
@@ -172,6 +172,19 @@ async def semer() -> None:
                 }
             )
 
+        for h in range(min(20, heures)):
+            debut = base_jour - timedelta(days=h * 3 + 1, hours=(suite_eleve + 2) % 6)
+            await BASE["seances"].insert_one(
+                {
+                    "id": nouvel_id(), "ecoleId": ecole_id, "eleveId": eleve_id,
+                    "moniteurId": moniteur["id"], "vehiculeId": "", "type": "code",
+                    "debut": debut, "fin": debut + timedelta(hours=1),
+                    "statut": "effectuee", "lieu": "Salle de code",
+                    "motif": "", "kilometrage": 0, "creePar": directeur_id,
+                    "creeLe": maintenant(), "modifieLe": maintenant(),
+                }
+            )
+
         # Séances à venir : le planning de la semaine et les rappels WhatsApp
         # du lendemain ont besoin de créneaux futurs.
         if statut == "actif":
@@ -245,10 +258,79 @@ async def semer() -> None:
                 }
             )
 
+    # --- Convocations déjà établies -------------------------------------
+    suite_convocation = 0
+    convocations: list[tuple[str, str, str]] = []  # (id, référence, nom)
+    for (eleve_id, nom_complet), ligne in zip(identifiants, eleves):
+        statut, heures = ligne[6], ligne[7]
+        if statut != "actif":
+            continue
+        part = min(100, round(heures * 100 / 20))
+        if part < 80:
+            continue
+        suite_convocation += 1
+        convocation_id = nouvel_id()
+        reference = f"CGI-{date.today().year}-{suite_convocation:04d}"
+        convocations.append((convocation_id, reference, nom_complet))
+        await BASE["convocations"].insert_one(
+            {
+                "id": convocation_id, "ecoleId": ecole_id, "eleveId": eleve_id,
+                "reference": reference, "epreuve": "conduite", "progression": part,
+                "eleveNom": nom_complet, "etabliePar": directeur_id,
+                "creeLe": maintenant() - timedelta(days=2),
+                "modifieLe": maintenant() - timedelta(days=2),
+            }
+        )
+    await BASE["compteurs"].insert_one(
+        {"ecoleId": ecole_id, "nom": "convocation", "valeur": suite_convocation}
+    )
+
+    # --- File WhatsApp déjà peuplée --------------------------------------
+    par_nom = {nom: (identifiant, ligne)
+               for (identifiant, nom), ligne in zip(identifiants, eleves)}
+
+    async def message(eleve_id, nom, telephone, motif, texte, cle, statut, jours):
+        await BASE["messages"].insert_one(
+            {
+                "id": nouvel_id(), "ecoleId": ecole_id, "eleveId": eleve_id,
+                "destinataire": nom, "telephone": telephone, "motif": motif,
+                "texte": texte, "statut": statut, "cle": cle,
+                "envoyeLe": (maintenant() - timedelta(days=jours)) if statut == "envoye" else None,
+                "envoyePar": directeur_id if statut == "envoye" else "",
+                "creeLe": maintenant() - timedelta(days=jours),
+                "modifieLe": maintenant() - timedelta(days=jours),
+            }
+        )
+
+    # Déjà envoyés : les félicitations des diplômés.
+    for nom_complet, (eleve_id, ligne) in par_nom.items():
+        if ligne[6] != "diplome":
+            continue
+        prenom = nom_complet.split(" ")[0]
+        await message(
+            eleve_id, nom_complet, ligne[2], "felicitations",
+            f"Félicitations {prenom} pour l'obtention de votre permis ! "
+            f"Toute l'équipe vous souhaite bonne route.",
+            f"felicitations:{eleve_id}", "envoye", 4,
+        )
+
+    # En attente : les convocations à transmettre.
+    for convocation_id, reference, nom_complet in convocations:
+        eleve_id, ligne = par_nom[nom_complet]
+        prenom = nom_complet.split(" ")[0]
+        await message(
+            eleve_id, nom_complet, ligne[2], "convocation",
+            f"Bonjour {prenom}, votre fiche de présentation à l'examen ({reference}) "
+            f"est prête. Passez la retirer à l'auto-école, munie de votre pièce "
+            f"d'identité.",
+            f"convocation:{convocation_id}", "en_attente", 2,
+        )
+
     total_eleves = len(eleves)
     print("Données de démonstration prêtes :")
     print(f"  {total_eleves} élèves · {len(moniteurs)} moniteurs · {len(flotte)} véhicules")
     print(f"  {suite_recu} encaissements étalés sur plusieurs mois")
+    print(f"  {suite_convocation} convocations établies · file WhatsApp amorcée")
     print("  Directeur : 0701020304 / demo1234")
     print("  Moniteur  : 0708080808 / demo1234")
 

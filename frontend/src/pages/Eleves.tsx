@@ -6,7 +6,7 @@ import { Link } from "react-router-dom";
 import { api } from "../api";
 import { Atelier } from "../components/Atelier";
 import {
-  Avis, Bloc, Champ, Chargement, Desert, Grille, JetonStatutEleve, Volet,
+  Avis, Barre, Bloc, Champ, Chargement, Desert, Grille, JetonStatutEleve, Volet,
 } from "../components/ui";
 import { LIBELLE_CATEGORIE, fFCFA, lienPortail, lienWhatsApp } from "../format";
 import { useChargement, useEnvoi } from "../hooks";
@@ -87,28 +87,44 @@ export default function Eleves() {
               colonnes={[
                 { cle: "eleve", libelle: "Élève" },
                 { cle: "statut", libelle: "Statut" },
-                { cle: "cat", libelle: "Catégorie" },
-                { cle: "frais", libelle: "Frais", droite: true },
+                { cle: "conduite", libelle: "Conduite" },
+                { cle: "solde", libelle: "Solde", droite: true },
                 { cle: "fiche", libelle: "Fiche", droite: true },
               ]}
             >
-              {donnees.map((e) => (
-                <tr key={e.id}>
-                  <td>
-                    <div className="nom-primaire">{e.prenoms} {e.nom}</div>
-                    <div className="nom-secondaire">
-                      {e.matricule} · {e.telephone}
-                      {e.commune ? ` · ${e.commune}` : ""}
-                    </div>
-                  </td>
-                  <td><JetonStatutEleve statut={e.statut} /></td>
-                  <td className="num">Permis {e.categorie}</td>
-                  <td className="num droite">{fFCFA(e.montantTotal)}</td>
-                  <td className="droite">
-                    <Link to={`/eleves/${e.id}`} className="lien-fiche">Ouvrir</Link>
-                  </td>
-                </tr>
-              ))}
+              {donnees.map((e) => {
+                const faites = e.progression?.heuresConduiteFaites ?? 0;
+                const prevues = e.progression?.heuresConduitePrevues ?? 0;
+                const part = prevues === 0 ? 0 : Math.round((faites / prevues) * 100);
+                const reste = e.solde?.reste ?? 0;
+                return (
+                  <tr key={e.id}>
+                    <td>
+                      <div className="nom-primaire">{e.prenoms} {e.nom}</div>
+                      <div className="nom-secondaire">
+                        {e.telephone}
+                        {e.commune ? ` · ${e.commune}` : ""} · Permis {e.categorie}
+                      </div>
+                    </td>
+                    <td><JetonStatutEleve statut={e.statut} /></td>
+                    <td style={{ minWidth: 160 }}>
+                      <Barre pourcentage={part} ton={part < 40 ? "orange" : undefined} />
+                      <div className="nom-secondaire" style={{ marginTop: 3 }}>
+                        {faites}/{prevues} h
+                      </div>
+                    </td>
+                    <td
+                      className="num droite"
+                      style={{ color: reste > 0 ? "var(--orange)" : "var(--vert)", fontWeight: 600 }}
+                    >
+                      {fFCFA(reste)}
+                    </td>
+                    <td className="droite">
+                      <Link to={`/eleves/${e.id}`} className="lien-fiche">Ouvrir</Link>
+                    </td>
+                  </tr>
+                );
+              })}
             </Grille>
           )}
         </Bloc>
