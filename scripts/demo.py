@@ -197,9 +197,19 @@ async def semer() -> None:
 
 
 if __name__ == "__main__":
+    import os
+
     import uvicorn
 
     from server import creer_app
 
+    # 0.0.0.0 et non 127.0.0.1 : dans un conteneur, un aperçu d'hébergeur se
+    # connecte depuis l'extérieur de la boucle locale. N'écouter que sur
+    # 127.0.0.1 donne un « connexion refusée » alors que le serveur tourne.
+    hote = os.environ.get("HOTE", "0.0.0.0")
+    port = int(os.environ.get("PORT", "8000"))
+
     asyncio.get_event_loop().run_until_complete(semer())
-    uvicorn.run(creer_app(CONFIG), host="127.0.0.1", port=8000, log_level="warning")
+    print(f"\nServeur de démonstration sur http://{hote}:{port}")
+    print("Base EN MÉMOIRE et secret fixe : démonstration uniquement.\n")
+    uvicorn.run(creer_app(CONFIG), host=hote, port=port, log_level="warning")
