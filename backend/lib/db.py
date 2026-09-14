@@ -21,6 +21,7 @@ SEANCES = "seances"
 VEHICULES = "vehicules"
 JOURNAL = "journal"
 CONVOCATIONS = "convocations"
+MESSAGES = "messages"
 COMPTEURS = "compteurs"
 
 _fabrique: Callable[[], Any] | None = None
@@ -80,6 +81,14 @@ async def creer_index(db: Any) -> None:
     await db[DEPENSES].create_index([("ecoleId", 1), ("date", 1)])
     await db[JOURNAL].create_index([("ecoleId", 1), ("creeLe", -1)])
     await db[CONVOCATIONS].create_index([("ecoleId", 1), ("reference", 1)], unique=True)
+    await db[MESSAGES].create_index([("ecoleId", 1), ("statut", 1), ("creeLe", -1)])
+    # Unicité sur la clé de déduplication : relancer la génération ne peut pas
+    # produire deux fois le même message pour le même élève.
+    await db[MESSAGES].create_index(
+        [("ecoleId", 1), ("cle", 1)],
+        unique=True,
+        partialFilterExpression={"cle": {"$gt": ""}},
+    )
     # Une seule fiche par élève et par épreuve : la « vérification » peut être
     # relancée autant de fois qu'on veut sans produire de doublon.
     await db[CONVOCATIONS].create_index(

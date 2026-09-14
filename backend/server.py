@@ -23,7 +23,7 @@ from lib.db import configurer_db, creer_index, fabrique_motor, obtenir_db
 from lib.deps import configurer_app
 from routers import (
     auth, convocations, ecole, eleves, paiements, personnel, portail, seances,
-    tableau_bord, vehicules,
+    tableau_bord, vehicules, whatsapp,
 )
 
 logger = logging.getLogger("gopermis")
@@ -69,7 +69,7 @@ def creer_app(config=None) -> FastAPI:
         )
 
     for module in (auth, eleves, paiements, seances, personnel, vehicules,
-                   convocations, tableau_bord, portail, ecole):
+                   convocations, whatsapp, tableau_bord, portail, ecole):
         app.include_router(module.routeur)
 
     @app.get("/api/sante", tags=["technique"])

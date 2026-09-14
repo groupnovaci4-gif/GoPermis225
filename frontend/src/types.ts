@@ -200,6 +200,24 @@ export interface Convocation {
   creeLe: string;
 }
 
+export type MotifMessage =
+  | "rappel_seance" | "relance_impaye" | "convocation" | "felicitations"
+  | "lien_portail" | "libre";
+
+export type StatutMessage = "en_attente" | "envoye" | "annule";
+
+export interface MessageWhatsApp {
+  id: string;
+  eleveId: string;
+  destinataire: string;
+  telephone: string;
+  motif: MotifMessage;
+  texte: string;
+  statut: StatutMessage;
+  envoyeLe?: string | null;
+  creeLe: string;
+}
+
 export interface EntreeJournal {
   id: string;
   acteurNom: string;

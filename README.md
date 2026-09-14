@@ -118,10 +118,15 @@ frontend/src/
 | Tableau de bord directeur | KPI, revenus 12 mois, élèves prêts, performance moniteurs |
 | Gestion des moniteurs | Fiches, compteur d'heures, salaire calculé |
 | Espace élève | Lien unique révocable, progression, solde, séances |
-| Notifications | Liens WhatsApp pré-remplis (relance, convocation, lien de suivi) |
+| Convocations CGI | Fiches établies à 80 % des heures, référence figée, PDF |
+| File WhatsApp | Messages préparés et dédupliqués, envoi assisté en un clic |
 
-Pas encore construits : WhatsApp Business API (envoi automatique), paiement en
-ligne Orange Money / Wave, génération PDF, multi-agences. Voir `CLAUDE.md`.
+Documents PDF : reçu de paiement et fiche de présentation à l'examen.
+
+Pas encore construits : l'envoi WhatsApp **automatique** (la file existe, il
+manque le compte WhatsApp Business), le paiement en ligne Orange Money / Wave,
+l'attestation de fin de formation et la fiche de paie en PDF, le multi-agences.
+Voir `CLAUDE.md`.
 
 ## Sécurité
 

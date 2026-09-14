@@ -113,7 +113,12 @@ backend/.venv/bin/python scripts/demo.py
     est recopiée : la fiche doit rester fidèle à ce qui a été signé, même si
     l'élève continue ses heures ensuite. Une seule fiche par élève et par
     épreuve — la vérification est relançable sans précaution.
-22. **L'application ne suppose jamais être servie à la racine d'un domaine.**
+22. **Tout message sortant porte une clé de déduplication déterministe**
+    (`impaye:<eleveId>:<palier>`, `rappel:<seanceId>`…). Relancer la
+    préparation ne doit jamais produire deux fois le même message : un élève
+    relancé trois fois le même jour cesse de lire. Un seul palier de relance
+    est retenu à la fois — le plus élevé atteint.
+23. **L'application ne suppose jamais être servie à la racine d'un domaine.**
     Elle doit fonctionner sous un préfixe (`/proxy/8000/`, un sous-dossier, un
     aperçu d'hébergeur). Trois choix le garantissent : `base: "./"` dans
     `vite.config.ts`, `urlApi()` qui résout contre `document.baseURI`, et
@@ -124,10 +129,14 @@ backend/.venv/bin/python scripts/demo.py
 
 ## 5. Reste à faire
 
-- **WhatsApp Business API.** Aujourd'hui l'application ouvre des liens `wa.me`
-  pré-remplis : l'utilisateur appuie sur « Envoyer ». L'envoi **automatique**
-  (rappel la veille, relance à 7/15/30 jours) demande un compte WhatsApp
-  Business, un numéro vérifié et des gabarits approuvés par Meta.
+- **Envoi WhatsApp automatique.** La file est construite
+  (`routers/whatsapp.py`) : les messages sont rédigés, dédupliqués et mis en
+  attente selon quatre règles. Il manque le **fournisseur** — un compte
+  WhatsApp Business, un numéro vérifié et des gabarits approuvés par Meta. Le
+  jour où il existe, il se branche derrière `statut = "en_attente"` ; rien
+  d'autre n'est à réécrire. Ne pas afficher « livré » tant qu'aucun accusé de
+  réception n'est reçu : aujourd'hui « envoyé » est déclaratif, et l'interface
+  le dit.
 - **Paiement en ligne** Orange Money / Wave : demande un contrat marchand.
 - **Attestation de fin de formation** et **fiche de paie** en PDF. Le reçu de
   paiement et la convocation d'examen, eux, sont faits (`lib/documents.py`,

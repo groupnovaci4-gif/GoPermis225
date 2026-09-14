@@ -37,13 +37,20 @@ configurer_db(lambda: BASE)
 
 
 async def semer() -> None:
-    """Jeu de données minimal : une école, un directeur, un moniteur, 3 élèves."""
+    """Jeu de données de démonstration, assez fourni pour un vrai essai.
+
+    Les dates sont relatives à aujourd'hui : les indicateurs « du mois », la
+    courbe sur douze mois, les paliers de relance et les alertes de flotte ont
+    donc toujours quelque chose à montrer, quel que soit le jour où la démo
+    est lancée.
+    """
     ecole_id = nouvel_id()
     await BASE["ecoles"].insert_one(
         {
             "id": ecole_id, "ecoleId": ecole_id, "nom": "Auto-École La Réussite",
-            "commune": "Yopougon", "telephone": "0707070707", "adresse": "Sicogi, Yopougon",
-            "agrement": "AG-2026-118", "logoUrl": "",
+            "commune": "Yopougon", "telephone": "0707070707",
+            "adresse": "Sicogi, face à la pharmacie du Marché", "agrement": "AG-2026-118",
+            "logoUrl": "",
             "tarifParCategorie": {"A": 90000, "B": 150000, "C": 250000},
             "heuresCodeParDefaut": 20, "heuresConduiteParDefaut": 20,
             "creeLe": maintenant(), "modifieLe": maintenant(),
@@ -59,8 +66,6 @@ async def semer() -> None:
         {"id": nouvel_id(), "nom": "Bamba Seydou", "telephone": "0710101010",
          "role": "moniteur", "tarifHoraire": 2800, "permisEnseigner": "MON-CI-5178"},
     ]
-    moniteur_id = moniteurs[0]["id"]
-
     for agent in [
         {"id": directeur_id, "nom": "M. Koffi Anzoumana", "telephone": "0701020304",
          "role": "directeur", "tarifHoraire": 0, "permisEnseigner": ""},
@@ -74,51 +79,88 @@ async def semer() -> None:
              "creeLe": maintenant(), "modifieLe": maintenant()}
         )
 
-    # (nom, prénoms, téléphone, frais, statut, index, heures de conduite faites)
+    # (nom, prénoms, tél, commune, catégorie, frais, statut, heures faites,
+    #  part réglée, jours depuis le dernier versement, mois depuis inscription)
     eleves = [
-        ("Traoré", "Awa", "0555111111", 150000, "actif", 1, 4),
-        ("Koné", "Ibrahim", "0555222222", 150000, "actif", 2, 17),
-        ("Bamba", "Fatou", "0555333333", 90000, "diplome", 3, 20),
-        ("N'Guessan", "Serge", "0555444444", 150000, "actif", 4, 18),
-        ("Diomandé", "Mariam", "0555555555", 150000, "actif", 5, 11),
-        ("Yapo", "Nadège", "0555666666", 250000, "actif", 6, 2),
-        ("Gbagbo", "Arsène", "0555777777", 150000, "suspendu", 7, 8),
-        ("Assi", "Emmanuel", "0555888888", 150000, "abandon", 8, 3),
+        ("Traoré", "Awa", "0555111111", "Yopougon", "B", 150000, "actif", 4, 0.50, 3, 2),
+        ("Koné", "Ibrahim", "0555222222", "Abobo", "B", 150000, "actif", 17, 1.00, 5, 5),
+        ("Bamba", "Fatou", "0555333333", "Cocody", "B", 150000, "diplome", 20, 1.00, 60, 8),
+        ("N'Guessan", "Serge", "0555444444", "Cocody", "B", 150000, "actif", 18, 1.00, 12, 6),
+        ("Diomandé", "Mariam", "0555555555", "Koumassi", "B", 150000, "actif", 11, 0.50, 9, 4),
+        ("Yapo", "Nadège", "0555666666", "Plateau", "C", 250000, "actif", 2, 0.30, 35, 1),
+        ("Gbagbo", "Arsène", "0555777777", "Marcory", "B", 150000, "suspendu", 8, 0.40, 48, 5),
+        ("Assi", "Emmanuel", "0555888888", "Treichville", "B", 150000, "abandon", 3, 0.80, 95, 9),
+        ("Kouadio", "Brou", "0555999999", "Cocody", "B", 150000, "actif", 6, 0.60, 16, 3),
+        ("Coulibaly", "Ibrahim", "0556000111", "Plateau", "A", 90000, "actif", 0, 0.00, 20, 1),
+        ("Sangaré", "Rokia", "0556000222", "Abobo", "C", 250000, "actif", 1, 0.20, 40, 2),
+        ("Touré", "Aminata", "0556000333", "Yopougon", "B", 150000, "actif", 14, 0.70, 6, 4),
+        ("Bakayoko", "Lassina", "0556000444", "Abobo", "B", 150000, "actif", 14, 0.20, 25, 3),
+        ("Konan", "Adjoua", "0556000555", "Treichville", "B", 150000, "diplome", 20, 1.00, 75, 10),
+        ("Kone", "Fatoumata", "0556000666", "Yopougon", "A", 90000, "recale", 20, 1.00, 50, 7),
     ]
-    for nom, prenoms, tel, montant, statut, index, heures_faites in eleves:
+
+    base_jour = datetime.now().replace(hour=8, minute=0, second=0, microsecond=0)
+    suite_recu = 0
+    suite_eleve = 0
+    identifiants: list[tuple[str, str]] = []
+
+    for (nom, prenoms, tel, commune, categorie, frais, statut, heures,
+         part_reglee, jours_dernier, mois_inscription) in eleves:
+        suite_eleve += 1
         eleve_id = nouvel_id()
+        identifiants.append((eleve_id, f"{prenoms} {nom}"))
+        inscription = date.today() - timedelta(days=30 * mois_inscription)
+
         await BASE["eleves"].insert_one(
             {
                 "id": eleve_id, "ecoleId": ecole_id,
-                "matricule": f"GP-{date.today().year}-{index:04d}",
+                "matricule": f"GP-{date.today().year}-{suite_eleve:04d}",
                 "nom": nom, "prenoms": prenoms, "telephone": tel, "telephoneTuteur": "",
-                "cni": "", "dateNaissance": None, "commune": "Yopougon", "photoUrl": "",
-                "categorie": "B", "statut": statut,
-                "dateInscription": date.today().isoformat(),
-                "montantTotal": montant, "heuresCodePrevues": 20,
+                "cni": f"CI{suite_eleve:06d}83", "dateNaissance": None,
+                "commune": commune, "photoUrl": "",
+                "categorie": categorie, "statut": statut,
+                "dateInscription": inscription.isoformat(),
+                "montantTotal": frais, "heuresCodePrevues": 20,
                 "heuresConduitePrevues": 20,
-                "resultatCode": "admis" if statut == "diplome" else "en_attente",
-                "resultatConduite": "admis" if statut == "diplome" else "en_attente",
+                "resultatCode": "admis" if statut in ("diplome", "recale") else "en_attente",
+                "resultatConduite": (
+                    "admis" if statut == "diplome"
+                    else "ajourne" if statut == "recale" else "en_attente"
+                ),
                 "datePermis": None, "historiqueStatuts": [],
                 "portailJeton": jeton_opaque(),
                 "creeLe": maintenant(), "modifieLe": maintenant(),
             }
         )
-        await BASE["paiements"].insert_one(
-            {
-                "id": nouvel_id(), "ecoleId": ecole_id, "eleveId": eleve_id,
-                "montant": montant // 2, "moyen": "orange_money",
-                "date": date.today().isoformat(), "reference": "",
-                "numeroRecu": f"REC-AUT-{index:06d}", "encaissePar": directeur_id,
-                "note": "", "clientOpId": f"demo-{index}",
-                "creeLe": maintenant(), "modifieLe": maintenant(),
-            }
-        )
-        # Séances passées, marquées effectuées : elles portent la progression.
-        moniteur = moniteurs[index % len(moniteurs)]
-        base_jour = datetime.now().replace(hour=8, minute=0, second=0, microsecond=0)
-        for h in range(heures_faites):
-            debut = base_jour - timedelta(days=h + 1, hours=(index % 5))
+
+        # Versements étalés dans le temps : la courbe sur douze mois et les
+        # paliers de relance ont besoin d'un historique, pas d'un seul montant.
+        a_regler = round(frais * part_reglee)
+        if a_regler > 0:
+            tranches = max(1, min(4, round(a_regler / 40000)))
+            unite = a_regler // tranches
+            for t in range(tranches):
+                dernier = t == tranches - 1
+                montant = a_regler - unite * (tranches - 1) if dernier else unite
+                jours = jours_dernier if dernier else jours_dernier + 30 * (tranches - t - 1)
+                suite_recu += 1
+                await BASE["paiements"].insert_one(
+                    {
+                        "id": nouvel_id(), "ecoleId": ecole_id, "eleveId": eleve_id,
+                        "montant": montant,
+                        "moyen": ["especes", "orange_money", "wave", "mtn_money"][t % 4],
+                        "date": (date.today() - timedelta(days=jours)).isoformat(),
+                        "reference": f"TX{suite_recu:08d}" if t % 4 else "",
+                        "numeroRecu": f"REC-AUT-{suite_recu:06d}",
+                        "encaissePar": directeur_id, "note": "",
+                        "clientOpId": f"demo-{eleve_id}-{t}",
+                        "creeLe": maintenant(), "modifieLe": maintenant(),
+                    }
+                )
+
+        moniteur = moniteurs[suite_eleve % len(moniteurs)]
+        for h in range(heures):
+            debut = base_jour - timedelta(days=h * 3 + 2, hours=suite_eleve % 5)
             await BASE["seances"].insert_one(
                 {
                     "id": nouvel_id(), "ecoleId": ecole_id, "eleveId": eleve_id,
@@ -129,27 +171,31 @@ async def semer() -> None:
                     "creeLe": maintenant(), "modifieLe": maintenant(),
                 }
             )
-        # Une séance à venir cette semaine, pour peupler le planning.
-        if statut == "actif":
-            prochain = base_jour + timedelta(days=(index % 5) + 1, hours=index % 4)
-            await BASE["seances"].insert_one(
-                {
-                    "id": nouvel_id(), "ecoleId": ecole_id, "eleveId": eleve_id,
-                    "moniteurId": moniteur["id"], "vehiculeId": "", "type": "conduite",
-                    "debut": prochain, "fin": prochain + timedelta(hours=1),
-                    "statut": "planifiee", "lieu": "Rond-point de la Sicogi",
-                    "motif": "", "kilometrage": 0, "creePar": directeur_id,
-                    "creeLe": maintenant(), "modifieLe": maintenant(),
-                }
-            )
 
-    # Le compteur doit refléter les reçus déjà semés, sinon le premier
-    # encaissement réel repart à 000001 et entre en collision.
+        # Séances à venir : le planning de la semaine et les rappels WhatsApp
+        # du lendemain ont besoin de créneaux futurs.
+        if statut == "actif":
+            for n in range(2):
+                prochain = base_jour + timedelta(
+                    days=(suite_eleve + n) % 6 + 1, hours=(suite_eleve + n) % 8
+                )
+                await BASE["seances"].insert_one(
+                    {
+                        "id": nouvel_id(), "ecoleId": ecole_id, "eleveId": eleve_id,
+                        "moniteurId": moniteurs[(suite_eleve + n) % len(moniteurs)]["id"],
+                        "vehiculeId": "", "type": "conduite" if n == 0 else "code",
+                        "debut": prochain, "fin": prochain + timedelta(hours=1),
+                        "statut": "planifiee", "lieu": "Rond-point de la Sicogi",
+                        "motif": "", "kilometrage": 0, "creePar": directeur_id,
+                        "creeLe": maintenant(), "modifieLe": maintenant(),
+                    }
+                )
+
     await BASE["compteurs"].insert_one(
-        {"ecoleId": ecole_id, "nom": "recu", "valeur": len(eleves)}
+        {"ecoleId": ecole_id, "nom": "recu", "valeur": suite_recu}
     )
     await BASE["compteurs"].insert_one(
-        {"ecoleId": ecole_id, "nom": "eleve", "valeur": len(eleves)}
+        {"ecoleId": ecole_id, "nom": "eleve", "valeur": suite_eleve}
     )
 
     flotte = [
@@ -179,19 +225,30 @@ async def semer() -> None:
             }
         )
 
-    for categorie, montant, jours in (
-        ("Carburant", 85000, 3), ("Salaire moniteur", 240000, 8),
-        ("Entretien véhicule", 68000, 15), ("Loyer", 150000, 20),
-    ):
-        await BASE["depenses"].insert_one(
-            {
-                "id": nouvel_id(), "ecoleId": ecole_id, "categorie": categorie,
-                "montant": montant, "date": (date.today() - timedelta(days=jours)).isoformat(),
-                "vehiculeId": "", "note": "", "saisiePar": directeur_id,
-                "creeLe": maintenant(), "modifieLe": maintenant(),
-            }
-        )
-    print("Données de démonstration prêtes.")
+    # Dépenses sur plusieurs mois : le résultat du mois et l'historique tiennent
+    # debout tous les deux.
+    for mois in range(5):
+        for categorie, montant in (
+            ("Carburant", 85000 + 5000 * mois), ("Salaire moniteur", 240000),
+            ("Entretien véhicule", 68000 if mois % 2 else 0), ("Loyer", 150000),
+            ("Électricité", 32000),
+        ):
+            if montant == 0:
+                continue
+            await BASE["depenses"].insert_one(
+                {
+                    "id": nouvel_id(), "ecoleId": ecole_id, "categorie": categorie,
+                    "montant": montant,
+                    "date": (date.today() - timedelta(days=30 * mois + 5)).isoformat(),
+                    "vehiculeId": "", "note": "", "saisiePar": directeur_id,
+                    "creeLe": maintenant(), "modifieLe": maintenant(),
+                }
+            )
+
+    total_eleves = len(eleves)
+    print("Données de démonstration prêtes :")
+    print(f"  {total_eleves} élèves · {len(moniteurs)} moniteurs · {len(flotte)} véhicules")
+    print(f"  {suite_recu} encaissements étalés sur plusieurs mois")
     print("  Directeur : 0701020304 / demo1234")
     print("  Moniteur  : 0708080808 / demo1234")
 

@@ -1,7 +1,8 @@
 /** Formatage : argent, dates, libellés. Passer par ces fonctions partout. */
 
 import type {
-  Categorie, MoyenPaiement, ResultatExamen, StatutEleve, StatutSeance, TypeSeance,
+  Categorie, MotifMessage, MoyenPaiement, ResultatExamen, StatutEleve,
+  StatutSeance, TypeSeance,
 } from "./types";
 
 /** Espace insécable étroit : « 150 000 FCFA » ne se coupe jamais en fin de ligne. */
@@ -94,6 +95,15 @@ export const LIBELLE_CATEGORIE: Record<Categorie, string> = {
   C: "C — Poids lourds",
   D: "D — Transport en commun",
   E: "E — Remorques",
+};
+
+export const LIBELLE_MOTIF: Record<MotifMessage, string> = {
+  rappel_seance: "Rappel de séance",
+  relance_impaye: "Relance d'impayé",
+  convocation: "Convocation à l'examen",
+  felicitations: "Félicitations",
+  lien_portail: "Lien de suivi",
+  libre: "Message libre",
 };
 
 /** Lien personnel du portail élève, valable sous n'importe quel préfixe.

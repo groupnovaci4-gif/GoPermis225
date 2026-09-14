@@ -21,6 +21,7 @@ import Portail from "./pages/Portail";
 import Reglages from "./pages/Reglages";
 import TableauBord from "./pages/TableauBord";
 import Vitrine from "./pages/Vitrine";
+import Whatsapp from "./pages/Whatsapp";
 
 export default function App() {
   const { session, pret, estMoniteur } = useSession();
@@ -69,6 +70,7 @@ export default function App() {
       <Route path="/planning" element={<Planning />} />
       <Route path="/flotte" element={<Flotte />} />
       <Route path="/convocations" element={<Convocations />} />
+      <Route path="/whatsapp" element={<Whatsapp />} />
       <Route path="/moniteurs" element={<Moniteurs />} />
       <Route path="/reglages" element={<Reglages />} />
       <Route path="*" element={<Navigate to={accueil} replace />} />

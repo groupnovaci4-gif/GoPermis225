@@ -37,6 +37,7 @@ export function Atelier({
     ...(peutGerer ? [{ chemin: "/flotte", libelle: "Flotte auto", icone: "◴" }] : []),
     ...(estDirecteur ? [{ chemin: "/moniteurs", libelle: "Moniteurs", icone: "◵" }] : []),
     ...(peutGerer ? [{ chemin: "/convocations", libelle: "Convocations CGI", icone: "◈" }] : []),
+    ...(peutGerer ? [{ chemin: "/whatsapp", libelle: "File WhatsApp", icone: "◐" }] : []),
     ...(estDirecteur ? [{ chemin: "/reglages", libelle: "Réglages", icone: "◷" }] : []),
   ];
 
