@@ -17,6 +17,7 @@ from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.types import Scope
 
 from lib.config import ConfigurationInvalide, charger_config
 from lib.db import configurer_db, creer_index, fabrique_motor, obtenir_db
@@ -36,6 +37,26 @@ async def cycle_de_vie(app: FastAPI):
     except Exception:  # noqa: BLE001 — l'API doit démarrer même si Mongo tarde
         logger.exception("Création des index impossible au démarrage.")
     yield
+
+
+class InterfaceStatique(StaticFiles):
+    """Sert l'interface en distinguant deux régimes de cache.
+
+    Les fichiers construits portent un nom haché (`index-C5AxrEgE.js`) : leur
+    contenu ne change jamais sous le même nom, on peut donc les garder en
+    cache un an. La page d'entrée, elle, garde toujours le même nom et pointe
+    vers les fichiers du moment : si le navigateur la met en cache, il
+    continue d'afficher l'ancienne version après un déploiement — même après
+    un rechargement forcé. Elle doit donc être revalidée à chaque visite.
+    """
+
+    async def get_response(self, path: str, scope: Scope):
+        reponse = await super().get_response(path, scope)
+        if path.endswith(".html") or path in ("", "."):
+            reponse.headers["Cache-Control"] = "no-cache, must-revalidate"
+        elif "/assets/" in f"/{path}":
+            reponse.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        return reponse
 
 
 def creer_app(config=None) -> FastAPI:
@@ -88,7 +109,7 @@ def creer_app(config=None) -> FastAPI:
     # montage racine.
     interface = Path(__file__).resolve().parent.parent / "frontend" / "dist"
     if interface.is_dir():
-        app.mount("/", StaticFiles(directory=interface, html=True), name="interface")
+        app.mount("/", InterfaceStatique(directory=interface, html=True), name="interface")
     else:
         logger.info(
             "Interface non construite (%s absent) : l'API seule est servie. "

@@ -215,3 +215,35 @@ async def test_la_paie_ne_compte_que_les_heures_du_mois_courant(client):
     assert ligne["heuresMois"] == 2          # les 2 h de l'autre mois sont écartées
     assert ligne["paieMois"] == 4000
     assert ligne["elevesSuivis"] == 1
+
+
+@pytest.mark.asyncio
+async def test_la_page_d_entree_n_est_jamais_mise_en_cache(client):
+    """Sinon le navigateur réaffiche l'ancienne version après un déploiement.
+
+    La page d'entrée garde toujours le même nom et pointe vers les fichiers du
+    moment : mise en cache, elle fige l'application sur une version périmée.
+    Les fichiers construits, eux, portent un nom haché et peuvent être gardés.
+    """
+    from pathlib import Path
+
+    from server import InterfaceStatique
+
+    # L'interface n'est pas forcément construite pendant les tests : on vérifie
+    # la règle elle-même, sur la classe qui la porte.
+    interface = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
+    if not interface.is_dir():
+        pytest.skip("Interface non construite : `yarn build` dans frontend/.")
+
+    statique = InterfaceStatique(directory=interface, html=True)
+    portee = {"type": "http", "method": "GET", "headers": []}
+
+    page = await statique.get_response("index.html", portee)
+    assert "no-cache" in page.headers["Cache-Control"]
+
+    nom_hache = next(
+        (f.name for f in (interface / "assets").iterdir() if f.suffix == ".js"), None,
+    )
+    if nom_hache:
+        fichier = await statique.get_response(f"assets/{nom_hache}", portee)
+        assert "immutable" in fichier.headers["Cache-Control"]

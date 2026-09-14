@@ -118,7 +118,13 @@ backend/.venv/bin/python scripts/demo.py
     préparation ne doit jamais produire deux fois le même message : un élève
     relancé trois fois le même jour cesse de lire. Un seul palier de relance
     est retenu à la fois — le plus élevé atteint.
-23. **L'application ne suppose jamais être servie à la racine d'un domaine.**
+23. **La page d'entrée n'est jamais mise en cache par le navigateur**
+    (`Cache-Control: no-cache, must-revalidate`, posé par `InterfaceStatique`
+    dans `server.py`). Elle garde toujours le même nom et pointe vers les
+    fichiers du moment : mise en cache, elle fige l'application sur une
+    version périmée, y compris après un rechargement forcé. Les fichiers
+    construits portent un nom haché et sont, eux, gardés un an.
+24. **L'application ne suppose jamais être servie à la racine d'un domaine.**
     Elle doit fonctionner sous un préfixe (`/proxy/8000/`, un sous-dossier, un
     aperçu d'hébergeur). Trois choix le garantissent : `base: "./"` dans
     `vite.config.ts`, `urlApi()` qui résout contre `document.baseURI`, et
