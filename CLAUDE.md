@@ -108,7 +108,12 @@ backend/.venv/bin/python scripts/demo.py
     session, jamais du client.
 20. **Un directeur ne peut pas se désactiver** ni se retirer son rôle : l'école
     se retrouverait sans personne pour réactiver quoi que ce soit.
-21. **L'application ne suppose jamais être servie à la racine d'un domaine.**
+21. **Une convocation est un document remis à un tiers.** Sa référence
+    (`CGI-<année>-0001`) est figée à l'émission et la progression constatée y
+    est recopiée : la fiche doit rester fidèle à ce qui a été signé, même si
+    l'élève continue ses heures ensuite. Une seule fiche par élève et par
+    épreuve — la vérification est relançable sans précaution.
+22. **L'application ne suppose jamais être servie à la racine d'un domaine.**
     Elle doit fonctionner sous un préfixe (`/proxy/8000/`, un sous-dossier, un
     aperçu d'hébergeur). Trois choix le garantissent : `base: "./"` dans
     `vite.config.ts`, `urlApi()` qui résout contre `document.baseURI`, et
@@ -124,7 +129,9 @@ backend/.venv/bin/python scripts/demo.py
   (rappel la veille, relance à 7/15/30 jours) demande un compte WhatsApp
   Business, un numéro vérifié et des gabarits approuvés par Meta.
 - **Paiement en ligne** Orange Money / Wave : demande un contrat marchand.
-- **Génération PDF** (reçu, attestation, convocation CGI, fiche de paie).
+- **Attestation de fin de formation** et **fiche de paie** en PDF. Le reçu de
+  paiement et la convocation d'examen, eux, sont faits (`lib/documents.py`,
+  ReportLab) — reprendre le même style d'en-tête et de pied de page.
 - **Multi-agences.** Le modèle porte déjà `ecoleId` partout ; il faudrait
   ajouter un niveau `agenceId` et un tableau de bord consolidé.
 - **Plan de paiement.** Le modèle `PlanPaiement` existe, les routes non.
@@ -150,6 +157,13 @@ Trois espaces distincts, à ne pas mélanger :
 | Espace de gestion | `#/tableau-de-bord`, `#/eleves`… | personnel authentifié |
 | Portail élève | `#/portail`, `#/portail/<jeton>` | élève, lecture seule |
 
+Quand tableau, quand fiche :
+
+- **tableau** (`<Grille>`) quand les lignes se comparent colonne par colonne —
+  élèves, encaissements, convocations, journal ;
+- **fiche** (`.fiches` / `.fiche`) quand une entité porte des valeurs de natures
+  différentes qu'une ligne écraserait — véhicule, moniteur, journée de planning.
+
 Conventions d'écriture :
 
 - les formulaires s'ouvrent dans un **volet latéral** (`<Volet>`), jamais dans
@@ -158,7 +172,10 @@ Conventions d'écriture :
   `<Indicateur>` ; les blocs par `<Bloc>` ;
 - aucune photographie n'est embarquée. Les visuels sont construits en CSS —
   une image de banque d'images poserait une question de droits que
-  l'auto-école n'a pas à hériter.
+  l'auto-école n'a pas à hériter ;
+- un document protégé se télécharge par `telecharger()` de `api.ts`, jamais par
+  un `<a href>` : un lien n'emporte pas l'en-tête `Authorization` et recevrait
+  un 401.
 
 ## 6. Conventions
 

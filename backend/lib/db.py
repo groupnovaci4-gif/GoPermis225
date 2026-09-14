@@ -20,6 +20,7 @@ DEPENSES = "depenses"
 SEANCES = "seances"
 VEHICULES = "vehicules"
 JOURNAL = "journal"
+CONVOCATIONS = "convocations"
 COMPTEURS = "compteurs"
 
 _fabrique: Callable[[], Any] | None = None
@@ -78,6 +79,12 @@ async def creer_index(db: Any) -> None:
     await db[VEHICULES].create_index([("ecoleId", 1), ("immatriculation", 1)], unique=True)
     await db[DEPENSES].create_index([("ecoleId", 1), ("date", 1)])
     await db[JOURNAL].create_index([("ecoleId", 1), ("creeLe", -1)])
+    await db[CONVOCATIONS].create_index([("ecoleId", 1), ("reference", 1)], unique=True)
+    # Une seule fiche par élève et par épreuve : la « vérification » peut être
+    # relancée autant de fois qu'on veut sans produire de doublon.
+    await db[CONVOCATIONS].create_index(
+        [("ecoleId", 1), ("eleveId", 1), ("epreuve", 1)], unique=True
+    )
 
 
 def sans_mongo_id(doc: dict[str, Any] | None) -> dict[str, Any] | None:

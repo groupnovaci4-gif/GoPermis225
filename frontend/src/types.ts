@@ -89,6 +89,8 @@ export interface Progression {
 export interface Paiement {
   id: string;
   eleveId: string;
+  /** Joint par le serveur pour l'affichage en liste. */
+  eleveNom?: string;
   montant: number;
   moyen: MoyenPaiement;
   date: string;
@@ -184,6 +186,18 @@ export interface DossierPortail {
     id: string; type: TypeSeance; debut: string; fin: string;
     statut: StatutSeance; lieu: string; moniteur: string; vehicule: string;
   }[];
+}
+
+export type Epreuve = "code" | "conduite";
+
+export interface Convocation {
+  id: string;
+  reference: string;
+  eleveId: string;
+  eleveNom: string;
+  epreuve: Epreuve;
+  progression: number;
+  creeLe: string;
 }
 
 export interface EntreeJournal {

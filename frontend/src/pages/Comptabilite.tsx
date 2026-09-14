@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
-import { api } from "../api";
+import { api, telecharger } from "../api";
 import { Atelier } from "../components/Atelier";
 import {
   Avis, Bloc, Champ, Chargement, Desert, Grille, Indicateur, Volet,
@@ -26,7 +26,7 @@ const CATEGORIES_DEPENSE = [
 ];
 
 export default function Comptabilite() {
-  const [onglet, setOnglet] = useState<"creances" | "encaissements" | "depenses">("creances");
+  const [onglet, setOnglet] = useState<"creances" | "encaissements" | "depenses">("encaissements");
   const [saisieDepense, setSaisieDepense] = useState(false);
 
   const impayes = useChargement<Impaye[]>(() => api.get<Impaye[]>("/api/impayes"), []);
@@ -34,8 +34,16 @@ export default function Comptabilite() {
   const depenses = useChargement<Depense[]>(() => api.get<Depense[]>("/api/depenses"), []);
 
   const totalCreances = (impayes.donnees ?? []).reduce((s, i) => s + i.reste, 0);
-  const totalEncaisse = (paiements.donnees ?? []).reduce((s, p) => s + p.montant, 0);
-  const totalDepenses = (depenses.donnees ?? []).reduce((s, d) => s + d.montant, 0);
+
+  // « Du mois » se calcule sur le mois courant, pas sur tout l'historique :
+  // c'est l'indicateur que le directeur regarde le matin.
+  const moisCourant = new Date().toISOString().slice(0, 7);
+  const duMois = (liste: { date: string; montant: number }[]) =>
+    liste.filter((x) => String(x.date).slice(0, 7) === moisCourant)
+      .reduce((s, x) => s + x.montant, 0);
+
+  const recettesMois = duMois(paiements.donnees ?? []);
+  const depensesMois = duMois(depenses.donnees ?? []);
 
   return (
     <Atelier
@@ -47,31 +55,34 @@ export default function Comptabilite() {
         </button>
       }
     >
-      <div className="rangs">
+      <div className="rangs-3">
+        <Indicateur
+          glyphe="◳" ton="vert" libelle="Recettes du mois"
+          valeur={fFCFA(recettesMois)}
+          note={`${fFCFA((paiements.donnees ?? []).reduce((s, p) => s + p.montant, 0))} depuis l'origine`}
+        />
+        <Indicateur
+          glyphe="↘" ton="rouge" libelle="Dépenses du mois"
+          valeur={fFCFA(depensesMois)}
+          note={`Résultat : ${fFCFA(recettesMois - depensesMois)}`}
+        />
         <Indicateur
           glyphe="↗" ton="orange" libelle="Créances ouvertes"
           valeur={fFCFA(totalCreances)}
-          note={`${(impayes.donnees ?? []).length} élève(s) à relancer`}
-        />
-        <Indicateur glyphe="◳" ton="vert" libelle="Total encaissé" valeur={fFCFA(totalEncaisse)} />
-        <Indicateur glyphe="↘" ton="rouge" libelle="Total dépenses" valeur={fFCFA(totalDepenses)} />
-        <Indicateur
-          glyphe="=" libelle="Résultat"
-          valeur={fFCFA(totalEncaisse - totalDepenses)}
-          note="Encaissé moins dépenses"
+          note={`${(impayes.donnees ?? []).length} élève(s) débiteur(s)`}
         />
       </div>
 
-      <div className="filtres">
+      <div className="onglets-texte">
         {([
-          ["creances", "Créances"],
           ["encaissements", "Encaissements"],
+          ["creances", "Créances"],
           ["depenses", "Dépenses"],
         ] as const).map(([cle, libelle]) => (
           <button
             key={cle}
             type="button"
-            className={`puce${onglet === cle ? " actif" : ""}`}
+            className={onglet === cle ? "actif" : ""}
             onClick={() => setOnglet(cle)}
           >
             {libelle}
@@ -140,22 +151,36 @@ export default function Comptabilite() {
             <Grille
               colonnes={[
                 { cle: "recu", libelle: "Reçu" },
+                { cle: "eleve", libelle: "Élève" },
                 { cle: "date", libelle: "Date" },
                 { cle: "moyen", libelle: "Moyen" },
-                { cle: "ref", libelle: "Référence" },
                 { cle: "montant", libelle: "Montant", droite: true },
-                { cle: "act", libelle: "", droite: true },
+                { cle: "doc", libelle: "Document", droite: true },
               ]}
             >
               {paiements.donnees.slice(0, 80).map((p) => (
                 <tr key={p.id}>
                   <td className="num">{p.numeroRecu}</td>
+                  <td>
+                    <Link to={`/eleves/${p.eleveId}`} style={{ textDecoration: "none", color: "inherit" }}>
+                      <span className="nom-primaire">{p.eleveNom || "—"}</span>
+                    </Link>
+                  </td>
                   <td className="num">{fDate(p.date)}</td>
                   <td><span className="jeton orange">{LIBELLE_MOYEN[p.moyen]}</span></td>
-                  <td className="num faible">{p.reference || "—"}</td>
-                  <td className="num droite">{fFCFA(p.montant)}</td>
+                  <td className="num droite" style={{ color: "var(--vert)", fontWeight: 600 }}>
+                    {fFCFA(p.montant)}
+                  </td>
                   <td className="droite">
-                    <Link to={`/eleves/${p.eleveId}`} className="lien-fiche">Dossier</Link>
+                    <button
+                      type="button"
+                      className="bouton nu"
+                      onClick={() =>
+                        telecharger(`/api/paiements/${p.id}/recu`, `${p.numeroRecu}.pdf`)
+                      }
+                    >
+                      ⭳ Reçu
+                    </button>
                   </td>
                 </tr>
               ))}

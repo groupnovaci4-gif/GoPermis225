@@ -4,13 +4,14 @@ from __future__ import annotations
 from datetime import date
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 
 from lib.autorisation import Session, exiger_directeur, exiger_gestion, interdit
 from lib.db import DEPENSES, ECOLES, ELEVES, PAIEMENTS, pour_mongo, prochaine_sequence, sans_mongo_id
 from lib.depot import filtre, lire_un, lister
 from lib.deps import db, session_courante
 from lib.journal import journaliser
+from lib.documents import recu_paiement
 from lib.metier import numero_recu, solde_eleve
 from models.communs import maintenant
 from models.finance import Depense, DepenseCreation, Paiement, PaiementCreation
@@ -72,7 +73,42 @@ async def lister_paiements(
 ) -> list[dict]:
     exiger_gestion(session)
     paiements = await lister(base, PAIEMENTS, session, limite=5000, eleveId=eleveId)
+
+    # Nom de l'élève joint ici : sinon le navigateur devrait charger tout le
+    # fichier élèves rien que pour afficher une colonne.
+    eleves = await lister(base, ELEVES, session, limite=5000)
+    noms = {e["id"]: f"{e.get('prenoms', '')} {e.get('nom', '')}".strip() for e in eleves}
+    for p in paiements:
+        p["eleveNom"] = noms.get(p.get("eleveId", ""), "")
+
     return sorted(paiements, key=lambda p: str(p.get("date", "")), reverse=True)
+
+
+@routeur.get("/paiements/{paiement_id}/recu")
+async def recu(
+    paiement_id: str,
+    base: Any = Depends(db),
+    session: Session = Depends(session_courante),
+) -> Response:
+    """PDF du reçu, à remettre à l'élève."""
+    exiger_gestion(session)
+
+    paiement = await lire_un(base, PAIEMENTS, session, paiement_id, "Paiement")
+    eleve = await lire_un(base, ELEVES, session, paiement["eleveId"], "Élève")
+    ecole = sans_mongo_id(await base[ECOLES].find_one({"id": session.ecoleId})) or {}
+    verses = await lister(base, PAIEMENTS, session, eleveId=eleve["id"], limite=1000)
+
+    contenu = recu_paiement(
+        ecole=ecole, eleve=eleve, paiement=paiement,
+        solde=solde_eleve(int(eleve.get("montantTotal", 0)), verses).as_dict(),
+    )
+    return Response(
+        content=contenu,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{paiement.get("numeroRecu", "recu")}.pdf"',
+        },
+    )
 
 
 @routeur.delete("/paiements/{paiement_id}")

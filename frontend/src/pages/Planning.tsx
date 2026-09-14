@@ -4,9 +4,7 @@ import { useMemo, useState } from "react";
 
 import { api } from "../api";
 import { Atelier } from "../components/Atelier";
-import {
-  Avis, Bloc, Champ, Chargement, Desert, Grille, JetonStatutSeance, Volet,
-} from "../components/ui";
+import { Avis, Champ, Chargement, JetonStatutSeance, Volet } from "../components/ui";
 import { LIBELLE_TYPE_SEANCE, fDuree, fHeure } from "../format";
 import { useChargement, useEnvoi } from "../hooks";
 import { useSession } from "../session";
@@ -27,6 +25,7 @@ export default function Planning() {
   const [semaine, setSemaine] = useState(0);
   const [creation, setCreation] = useState(false);
   const [aCloturer, setACloturer] = useState<Seance | null>(null);
+  const [filtreMoniteur, setFiltreMoniteur] = useState("");
 
   const debut = useMemo(() => {
     const d = lundiDe(new Date());
@@ -55,24 +54,33 @@ export default function Planning() {
   };
   const nomMoniteur = (id: string) => personnel?.find((x) => x.id === id)?.nom ?? "—";
 
+  const visibles = useMemo(
+    () => (donnees ?? []).filter((s) => !filtreMoniteur || s.moniteurId === filtreMoniteur),
+    [donnees, filtreMoniteur],
+  );
+
   const parJour = useMemo(() => {
     const groupes: Seance[][] = [[], [], [], [], [], [], []];
-    for (const s of donnees ?? []) {
-      groupes[(new Date(s.debut).getDay() + 6) % 7]?.push(s);
-    }
+    for (const s of visibles) groupes[(new Date(s.debut).getDay() + 6) % 7]?.push(s);
     for (const g of groupes) g.sort((a, b) => a.debut.localeCompare(b.debut));
     return groupes;
-  }, [donnees]);
+  }, [visibles]);
 
-  const libelleSemaine =
-    semaine === 0
-      ? "Cette semaine"
-      : `Semaine du ${debut.toLocaleDateString("fr-FR", { day: "2-digit", month: "long" })}`;
+  /** Validation en un clic depuis la carte du jour.
+   *
+   * Réservée au cas « effectuée » : une absence ou une annulation exige un
+   * motif, donc elle passe par le volet. */
+  async function cloturer(seance: Seance, statut: "effectuee") {
+    await api.patch(`/api/seances/${seance.id}`, { statut });
+    recharger();
+  }
+
+  const libelleSemaine = `Semaine du ${debut.toLocaleDateString("fr-FR", { day: "2-digit", month: "long" })}`;
 
   return (
     <Atelier
       titre="Planning"
-      sous={estMoniteur ? "Vos séances" : "Toutes les séances de l'école"}
+      sous={libelleSemaine}
       outils={
         <>
           <button type="button" className="bouton doux" onClick={() => setSemaine((s) => s - 1)}>
@@ -92,57 +100,96 @@ export default function Planning() {
         </>
       }
     >
-      <div className="sur-titre">{libelleSemaine}</div>
+      <div className="ligne-flex" style={{ gap: 12, flexWrap: "wrap" }}>
+        {!estMoniteur && (
+          <select
+            value={filtreMoniteur}
+            onChange={(e) => setFiltreMoniteur(e.target.value)}
+            aria-label="Filtrer par moniteur"
+            style={{ width: "auto", minWidth: 190 }}
+          >
+            <option value="">Tous les moniteurs</option>
+            {(personnel ?? []).filter((p) => p.role === "moniteur").map((m) => (
+              <option key={m.id} value={m.id}>{m.nom}</option>
+            ))}
+          </select>
+        )}
+        <span className="faible">{visibles.length} séance(s)</span>
+      </div>
 
-      {chargement && <Chargement lignes={5} />}
+      {chargement && <Chargement lignes={4} />}
       {erreur && <Avis ton="erreur">{erreur}</Avis>}
 
-      {donnees && donnees.length === 0 && (
-        <Bloc><Desert glyphe="◰">Aucune séance planifiée cette semaine.</Desert></Bloc>
-      )}
-
-      {donnees && donnees.length > 0 &&
-        JOURS.map((jour, index) => {
-          const seances = parJour[index] ?? [];
-          if (seances.length === 0) return null;
+      <div className="semaine">
+        {JOURS.map((jour, index) => {
           const dateJour = new Date(debut);
           dateJour.setDate(dateJour.getDate() + index);
+          const seances = parJour[index] ?? [];
+          const estAujourdhui = dateJour.toDateString() === new Date().toDateString();
+
           return (
-            <Bloc
-              key={jour}
-              titre={`${jour} ${dateJour.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" })}`}
-              sansPadding
-            >
-              <Grille
-                colonnes={[
-                  { cle: "h", libelle: "Heure" },
-                  { cle: "eleve", libelle: "Élève" },
-                  { cle: "type", libelle: "Type" },
-                  ...(estMoniteur ? [] : [{ cle: "mon", libelle: "Moniteur" }]),
-                  { cle: "lieu", libelle: "Lieu" },
-                  { cle: "statut", libelle: "Statut", droite: true },
-                  { cle: "act", libelle: "", droite: true },
-                ]}
-              >
-                {seances.map((s) => (
-                  <tr key={s.id}>
-                    <td className="num">{fHeure(s.debut)}</td>
-                    <td className="nom-primaire">{nomEleve(s.eleveId)}</td>
-                    <td>{LIBELLE_TYPE_SEANCE[s.type]} · {fDuree(s.debut, s.fin)}</td>
-                    {!estMoniteur && <td>{nomMoniteur(s.moniteurId)}</td>}
-                    <td className="faible">{s.lieu || "—"}</td>
-                    <td className="droite"><JetonStatutSeance statut={s.statut} /></td>
-                    <td className="droite">
-                      <button type="button" className="bouton nu" onClick={() => setACloturer(s)}>
-                        Clôturer
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </Grille>
-            </Bloc>
+            <div key={jour} className={`jour${estAujourdhui ? " aujourdhui" : ""}`}>
+              <div className="jour-tete">
+                <span className="nom">{jour}</span>
+                <span className="date">
+                  {dateJour.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" })}
+                </span>
+              </div>
+
+              {seances.length === 0 ? (
+                <div className="rien">Aucune séance</div>
+              ) : (
+                seances.map((s) => (
+                  <div key={s.id} className={`creneau ${s.statut}`}>
+                    <div className="creneau-tete">
+                      <span className="heure">{fHeure(s.debut)}</span>
+                      <JetonStatutSeance statut={s.statut} />
+                    </div>
+                    <div className="qui">{nomEleve(s.eleveId)}</div>
+                    <div className="quoi">
+                      {LIBELLE_TYPE_SEANCE[s.type]} · {fDuree(s.debut, s.fin)}
+                      {!estMoniteur && ` · ${nomMoniteur(s.moniteurId)}`}
+                      {s.lieu ? ` · ${s.lieu}` : ""}
+                    </div>
+                    {s.statut === "planifiee" && (
+                      <div className="boutons">
+                        <button
+                          type="button"
+                          className="bouton"
+                          style={{ padding: "4px 10px", fontSize: 11.5 }}
+                          onClick={() => cloturer(s, "effectuee")}
+                        >
+                          Valider
+                        </button>
+                        <button
+                          type="button"
+                          className="bouton doux"
+                          style={{ padding: "4px 10px", fontSize: 11.5 }}
+                          onClick={() => setACloturer(s)}
+                        >
+                          Absent
+                        </button>
+                      </div>
+                    )}
+                    {s.statut !== "planifiee" && (
+                      <div className="boutons">
+                        <button
+                          type="button"
+                          className="bouton nu"
+                          style={{ padding: "2px 6px", fontSize: 11.5 }}
+                          onClick={() => setACloturer(s)}
+                        >
+                          Modifier
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
           );
         })}
+      </div>
 
       {creation && (
         <VoletCreation

@@ -21,7 +21,10 @@ from fastapi.staticfiles import StaticFiles
 from lib.config import ConfigurationInvalide, charger_config
 from lib.db import configurer_db, creer_index, fabrique_motor, obtenir_db
 from lib.deps import configurer_app
-from routers import auth, ecole, eleves, paiements, personnel, portail, seances, tableau_bord, vehicules
+from routers import (
+    auth, convocations, ecole, eleves, paiements, personnel, portail, seances,
+    tableau_bord, vehicules,
+)
 
 logger = logging.getLogger("gopermis")
 
@@ -65,7 +68,8 @@ def creer_app(config=None) -> FastAPI:
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, content={"detail": str(exc)}
         )
 
-    for module in (auth, eleves, paiements, seances, personnel, vehicules, tableau_bord, portail, ecole):
+    for module in (auth, eleves, paiements, seances, personnel, vehicules,
+                   convocations, tableau_bord, portail, ecole):
         app.include_router(module.routeur)
 
     @app.get("/api/sante", tags=["technique"])

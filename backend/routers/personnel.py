@@ -1,18 +1,19 @@
 """Personnel : moniteurs et secrétaires. Réservé au directeur."""
 from __future__ import annotations
 
+from datetime import date, datetime, timedelta
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from lib.autorisation import Session, exiger_directeur, exiger_personnel
-from lib.db import SEANCES, UTILISATEURS, pour_mongo
+from lib.db import ELEVES, SEANCES, UTILISATEURS, pour_mongo
 from lib.depot import champs_modifies, filtre, lire_un, lister
 from lib.deps import db, session_courante
 from lib.journal import journaliser
 from lib.metier import salaire_moniteur
 from lib.securite import hacher_secret
-from models.communs import Role, maintenant, normaliser_telephone
+from models.communs import Role, StatutEleve, maintenant, normaliser_telephone
 from models.ecole import Utilisateur, UtilisateurCreation, UtilisateurMaj
 
 routeur = APIRouter(prefix="/api/personnel", tags=["personnel"])
@@ -145,6 +146,67 @@ async def reinitialiser_mot_de_passe(
         base, session, "personnel.mot_de_passe", cible_type="utilisateur", cible_id=agent_id
     )
     return {"reinitialise": agent_id}
+
+
+@routeur.get("/paie")
+async def paie_du_mois(
+    base: Any = Depends(db),
+    session: Session = Depends(session_courante),
+) -> list[dict]:
+    """Heures et rémunération de chaque moniteur, sur la semaine et le mois.
+
+    Un point d'entrée dédié plutôt que le tableau de bord complet : la page
+    Moniteurs n'a pas besoin des recettes ni des créances de l'école.
+    """
+    exiger_directeur(session)
+
+    agents = await lister(base, UTILISATEURS, session, limite=200)
+    seances = await lister(base, SEANCES, session, limite=20000)
+    eleves = await lister(base, ELEVES, session, limite=5000)
+
+    aujourdhui = date.today()
+    debut_semaine = aujourdhui - timedelta(days=aujourdhui.weekday())
+
+    def _jour(valeur) -> date | None:
+        if isinstance(valeur, datetime):
+            return valeur.date()
+        return valeur if isinstance(valeur, date) else None
+
+    de_la_semaine = [s for s in seances if (j := _jour(s.get("debut"))) and j >= debut_semaine]
+    du_mois = [
+        s for s in seances
+        if (j := _jour(s.get("debut")))
+        and (j.year, j.month) == (aujourdhui.year, aujourdhui.month)
+    ]
+
+    lignes = []
+    for a in agents:
+        if a.get("role") != Role.MONITEUR.value:
+            continue
+        tarif = int(a.get("tarifHoraire", 0))
+        ses_eleves = {s.get("eleveId") for s in seances if s.get("moniteurId") == a["id"]}
+        formes = [e for e in eleves if e["id"] in ses_eleves]
+        diplomes = len([e for e in formes if e.get("statut") == StatutEleve.DIPLOME.value])
+        recales = len([e for e in formes if e.get("statut") == StatutEleve.RECALE.value])
+        termines = diplomes + recales
+
+        mois = salaire_moniteur(du_mois, a["id"], tarif)
+        lignes.append(
+            {
+                "moniteurId": a["id"],
+                "nom": a.get("nom", ""),
+                "telephone": a.get("telephone", ""),
+                "actif": a.get("actif", True),
+                "permisEnseigner": a.get("permisEnseigner", ""),
+                "tarifHoraire": tarif,
+                "heuresSemaine": salaire_moniteur(de_la_semaine, a["id"], tarif)["heures"],
+                "heuresMois": mois["heures"],
+                "paieMois": mois["montant"],
+                "elevesSuivis": len(ses_eleves),
+                "tauxReussite": 0 if termines == 0 else round(diplomes * 100 / termines),
+            }
+        )
+    return sorted(lignes, key=lambda l: l["nom"])
 
 
 @routeur.get("/{agent_id}/salaire")

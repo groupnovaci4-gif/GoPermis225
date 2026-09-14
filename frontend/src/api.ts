@@ -115,6 +115,32 @@ export const api = {
   delete: <T>(chemin: string) => requete<T>("DELETE", chemin),
 };
 
+/** Télécharge un document protégé (reçu, convocation).
+ *
+ * Un `<a href>` n'emporte pas l'en-tête `Authorization` : le serveur
+ * répondrait 401. On récupère donc le fichier par `fetch`, puis on fabrique un
+ * objet-URL le temps du clic — révoqué juste après pour ne pas garder le
+ * document en mémoire.
+ */
+export async function telecharger(chemin: string, nomFichier: string): Promise<void> {
+  const reponse = await fetch(urlApi(chemin), {
+    headers: jetonCourant ? { Authorization: `Bearer ${jetonCourant}` } : {},
+  });
+  if (!reponse.ok) {
+    if (reponse.status === 401) surSessionPerdue?.();
+    throw new ErreurApi("Le document n'a pas pu être téléchargé.", reponse.status);
+  }
+  const blob = await reponse.blob();
+  const url = URL.createObjectURL(blob);
+  const lien = document.createElement("a");
+  lien.href = url;
+  lien.download = nomFichier;
+  document.body.appendChild(lien);
+  lien.click();
+  lien.remove();
+  URL.revokeObjectURL(url);
+}
+
 /** Identifiant d'opération unique, pour rendre une écriture idempotente. */
 export function nouvelOpId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;

@@ -379,3 +379,92 @@ textarea { min-height: 70px; resize: vertical; }
   .vitrine .heros h1 { font-size: 29px; }
   input, select, textarea { font-size: 16px; }  /* en dessous, iOS zoome */
 }
+
+/* ------------------------------------------------------- Cartes en grille
+
+   Certaines vues se lisent mieux en fiches qu'en tableau : un véhicule, un
+   moniteur ou une journée de planning portent plusieurs valeurs de natures
+   différentes, qu'une ligne de tableau écraserait. */
+
+.fiches { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); }
+
+.fiche {
+  background: var(--surface); border: 1px solid var(--bordure);
+  border-radius: var(--rayon); box-shadow: var(--ombre); padding: 14px;
+  display: flex; flex-direction: column;
+}
+.fiche-tete { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 12px; }
+.fiche-tete .identite { flex: 1; min-width: 0; }
+.fiche-tete .principal { font-family: var(--mono); font-size: 14px; font-weight: 650; }
+.fiche-tete .principal.texte { font-family: inherit; }
+.fiche-tete .secondaire { font-size: 11.5px; color: var(--texte-faible); }
+
+/* Couples libellé / valeur sur deux colonnes. */
+.paires { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px 14px; }
+.paires .cle { font-size: 10px; letter-spacing: .05em; text-transform: uppercase; color: var(--texte-faible); }
+.paires .val { font-family: var(--mono); font-size: 12.5px; font-weight: 600; margin-top: 1px; }
+.paires .val.texte { font-family: inherit; font-weight: 500; }
+
+.encart {
+  margin-top: 12px; padding: 9px 12px; border-radius: var(--rayon-s);
+  background: var(--vert-pale);
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+}
+.encart .cle { font-size: 10px; letter-spacing: .07em; text-transform: uppercase; color: var(--vert-fonce); font-weight: 650; }
+.encart .val { font-family: var(--mono); font-size: 14px; font-weight: 650; color: var(--vert-fonce); }
+
+.journal-mini { margin-top: 12px; border-top: 1px solid var(--bordure); padding-top: 9px; }
+.journal-mini .entree {
+  display: flex; justify-content: space-between; gap: 10px;
+  font-size: 12px; padding: 3px 0;
+}
+.journal-mini .entree .montant { font-family: var(--mono); color: var(--texte-doux); white-space: nowrap; }
+
+/* ---------------------------------------------------- Planning en journées */
+
+.semaine { display: grid; gap: 12px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 1180px) { .semaine { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 760px) { .semaine { grid-template-columns: 1fr; } .fiches { grid-template-columns: 1fr; } }
+
+.jour {
+  background: var(--surface); border: 1px solid var(--bordure);
+  border-radius: var(--rayon); box-shadow: var(--ombre); padding: 12px; min-height: 108px;
+}
+.jour.aujourdhui { border-color: var(--vert); box-shadow: 0 0 0 1px var(--vert-pale), var(--ombre); }
+.jour-tete { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 9px; }
+.jour-tete .nom { font-size: 12.5px; font-weight: 650; }
+.jour-tete .date { font-family: var(--mono); font-size: 11px; color: var(--texte-faible); }
+.jour .rien { font-size: 11.5px; color: var(--texte-faible); font-style: italic; }
+
+.creneau {
+  background: var(--surface-2); border-radius: var(--rayon-s);
+  padding: 9px 10px; margin-bottom: 7px;
+}
+.creneau:last-child { margin-bottom: 0; }
+.creneau.effectuee { background: var(--vert-pale); }
+.creneau.annulee, .creneau.absent { background: var(--rouge-pale); }
+.creneau-tete { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.creneau .heure { font-family: var(--mono); font-size: 12px; font-weight: 650; }
+.creneau .qui { font-size: 12.5px; font-weight: 600; margin-top: 1px; }
+.creneau .quoi { font-size: 11px; color: var(--texte-faible); }
+.creneau .boutons { display: flex; gap: 6px; margin-top: 7px; }
+
+/* ------------------------------------------------- Onglets soulignés (texte) */
+
+.onglets-texte { display: flex; gap: 18px; border-bottom: 1px solid var(--bordure); }
+.onglets-texte button {
+  background: none; border: 0; padding: 7px 1px; cursor: pointer;
+  font: inherit; font-size: 12.5px; color: var(--texte-faible);
+  border-bottom: 2px solid transparent; margin-bottom: -1px;
+}
+.onglets-texte button:hover { color: var(--texte); }
+.onglets-texte button.actif { color: var(--texte); font-weight: 600; border-bottom-color: var(--vert); }
+
+.bandeau-info {
+  display: flex; gap: 10px; align-items: flex-start;
+  background: var(--surface); border: 1px solid var(--bordure);
+  border-radius: var(--rayon); padding: 12px 14px;
+}
+.bandeau-info .glyphe { color: var(--vert); font-size: 14px; line-height: 1.2; }
+.bandeau-info .titre { font-size: 12.5px; font-weight: 650; margin-bottom: 2px; }
+.bandeau-info p { font-size: 12px; color: var(--texte-doux); margin: 0; }

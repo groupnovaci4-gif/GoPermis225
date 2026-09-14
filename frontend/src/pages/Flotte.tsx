@@ -7,6 +7,7 @@ import { Atelier } from "../components/Atelier";
 import {
   Avis, Bloc, Champ, Chargement, Desert, Grille, Jeton, Volet,
 } from "../components/ui";
+
 import { aujourdhuiISO, fDate, fFCFA } from "../format";
 import { useChargement, useEnvoi } from "../hooks";
 import type { Vehicule } from "../types";
@@ -21,7 +22,11 @@ export default function Flotte() {
   return (
     <Atelier
       titre="Flotte automobile"
-      sous={donnees ? `${donnees.length} véhicule(s)` : undefined}
+      sous={
+        donnees
+          ? `${donnees.length} véhicule(s) · ${donnees.reduce((n, v) => n + (v.alertes?.length ?? 0), 0)} alerte(s)`
+          : undefined
+      }
       outils={
         <button type="button" className="bouton" onClick={() => setCreation(true)}>
           Ajouter un véhicule
@@ -31,57 +36,85 @@ export default function Flotte() {
       {chargement && <Chargement lignes={4} />}
       {erreur && <Avis ton="erreur">{erreur}</Avis>}
 
-      {donnees && (
-        <Bloc sansPadding>
-          {donnees.length === 0 ? (
-            <Desert glyphe="◴">
-              Aucun véhicule enregistré. Ajoutez-en un pour suivre assurance,
-              visite technique et entretien.
-            </Desert>
-          ) : (
-            <Grille
-              colonnes={[
-                { cle: "immat", libelle: "Véhicule" },
-                { cle: "km", libelle: "Kilométrage", droite: true },
-                { cle: "assur", libelle: "Assurance" },
-                { cle: "visite", libelle: "Visite technique" },
-                { cle: "etat", libelle: "État", droite: true },
-                { cle: "act", libelle: "Fiche", droite: true },
-              ]}
-            >
-              {donnees.map((v) => {
-                const expire = (v.alertes ?? []).filter((a) => a.niveau === "expire").length;
-                const bientot = (v.alertes ?? []).filter((a) => a.niveau === "bientot").length;
-                return (
-                  <tr key={v.id}>
-                    <td>
-                      <div className="nom-primaire mono">{v.immatriculation}</div>
-                      <div className="nom-secondaire">
-                        {v.modele}{v.annee ? ` · ${v.annee}` : ""}
+      {donnees && donnees.length === 0 && (
+        <Desert glyphe="◴">
+          Aucun véhicule enregistré. Ajoutez-en un pour suivre assurance,
+          visite technique et entretien.
+        </Desert>
+      )}
+
+      {donnees && donnees.length > 0 && (
+        <div className="fiches">
+          {donnees.map((v) => {
+            const cout = (v.entretiens ?? []).reduce((s, e) => s + (e.cout || 0), 0);
+            const expire = (v.alertes ?? []).filter((a) => a.niveau === "expire");
+            const bientot = (v.alertes ?? []).filter((a) => a.niveau === "bientot");
+            return (
+              <article key={v.id} className="fiche">
+                <div className="fiche-tete">
+                  <div className="identite">
+                    <div className="principal">{v.immatriculation}</div>
+                    <div className="secondaire">
+                      {v.modele}{v.annee ? ` · ${v.annee}` : ""}
+                    </div>
+                  </div>
+                  {v.actif ? <Jeton ton="vert">Disponible</Jeton> : <Jeton ton="orange">En maintenance</Jeton>}
+                </div>
+
+                <div className="paires">
+                  <div>
+                    <div className="cle">Kilométrage</div>
+                    <div className="val">{v.kilometrage.toLocaleString("fr-FR")} km</div>
+                  </div>
+                  <div>
+                    <div className="cle">Coût entretien</div>
+                    <div className="val">{fFCFA(cout)}</div>
+                  </div>
+                  <div>
+                    <div className="cle">Assurance</div>
+                    <div className="val">{fDate(v.assuranceExpire)}</div>
+                  </div>
+                  <div>
+                    <div className="cle">Visite technique</div>
+                    <div className="val">{fDate(v.visiteTechniqueExpire)}</div>
+                  </div>
+                </div>
+
+                {expire.map((a, i) => (
+                  <Avis key={`x${i}`} ton="erreur">
+                    ⚠ {a.libelle} expirée le {fDate(a.echeance)}
+                  </Avis>
+                ))}
+                {bientot.map((a, i) => (
+                  <Avis key={`b${i}`} ton="alerte">
+                    ⚠ {a.libelle} expire le {fDate(a.echeance)} — dans {a.jours} jours
+                  </Avis>
+                ))}
+
+                {(v.entretiens ?? []).length > 0 && (
+                  <div className="journal-mini">
+                    <div className="sur-titre" style={{ marginBottom: 5 }}>Journal d'entretien</div>
+                    {(v.entretiens ?? []).slice().reverse().slice(0, 4).map((e, i) => (
+                      <div key={i} className="entree">
+                        <span>{e.nature}</span>
+                        <span className="montant">{fFCFA(e.cout)}</span>
                       </div>
-                    </td>
-                    <td className="num droite">{v.kilometrage.toLocaleString("fr-FR")} km</td>
-                    <td className="num">{fDate(v.assuranceExpire)}</td>
-                    <td className="num">{fDate(v.visiteTechniqueExpire)}</td>
-                    <td className="droite">
-                      {!v.actif && <Jeton ton="rouge">Hors service</Jeton>}
-                      {v.actif && expire > 0 && <Jeton ton="rouge">{expire} expiré(s)</Jeton>}
-                      {v.actif && expire === 0 && bientot > 0 && (
-                        <Jeton ton="orange">{bientot} à renouveler</Jeton>
-                      )}
-                      {v.actif && expire === 0 && bientot === 0 && <Jeton ton="vert">À jour</Jeton>}
-                    </td>
-                    <td className="droite">
-                      <button type="button" className="bouton nu" onClick={() => setFiche(v)}>
-                        Ouvrir
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </Grille>
-          )}
-        </Bloc>
+                    ))}
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  className="bouton doux large"
+                  style={{ marginTop: "auto", marginBlockStart: 12 }}
+                  onClick={() => setFiche(v)}
+                >
+                  Enregistrer un entretien
+                </button>
+              </article>
+            );
+          })}
+        </div>
       )}
 
       {creation && (

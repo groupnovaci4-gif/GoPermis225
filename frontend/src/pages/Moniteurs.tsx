@@ -4,12 +4,19 @@ import { useState } from "react";
 
 import { api } from "../api";
 import { Atelier } from "../components/Atelier";
-import {
-  Avis, Bloc, Champ, Chargement, Desert, Grille, Jeton, Volet,
-} from "../components/ui";
+import { Avis, Bloc, Champ, Chargement, Desert, Jeton, Volet } from "../components/ui";
 import { fFCFA } from "../format";
 import { useChargement, useEnvoi } from "../hooks";
 import type { Role, Utilisateur } from "../types";
+
+interface LignePaie {
+  moniteurId: string;
+  heuresSemaine: number;
+  heuresMois: number;
+  paieMois: number;
+  elevesSuivis: number;
+  tauxReussite: number;
+}
 
 const LIBELLE_ROLE: Record<Role, string> = {
   directeur: "Directeur",
@@ -23,11 +30,14 @@ export default function Moniteurs() {
   const { donnees, chargement, erreur, recharger } = useChargement<Utilisateur[]>(
     () => api.get<Utilisateur[]>("/api/personnel"), [],
   );
+  // Heures et paie du mois, calculées par le serveur : la page ne doit pas
+  // recharger tout le tableau de bord pour afficher une carte.
+  const paie = useChargement<LignePaie[]>(() => api.get<LignePaie[]>("/api/personnel/paie"), []);
 
   return (
     <Atelier
       titre="Moniteurs et personnel"
-      sous={donnees ? `${donnees.length} collaborateur(s)` : undefined}
+      sous={donnees ? `${donnees.length} collaborateur(s) · heures validées et paie du mois` : undefined}
       outils={
         <button type="button" className="bouton" onClick={() => setCreation(true)}>
           Ajouter un collaborateur
@@ -37,43 +47,83 @@ export default function Moniteurs() {
       {chargement && <Chargement lignes={4} />}
       {erreur && <Avis ton="erreur">{erreur}</Avis>}
 
-      {donnees && (
-        <Bloc sansPadding>
-          {donnees.length === 0 ? (
-            <Desert glyphe="◵">Aucun collaborateur enregistré.</Desert>
-          ) : (
-            <Grille
-              colonnes={[
-                { cle: "nom", libelle: "Collaborateur" },
-                { cle: "role", libelle: "Rôle" },
-                { cle: "tarif", libelle: "Tarif horaire", droite: true },
-                { cle: "etat", libelle: "État", droite: true },
-                { cle: "act", libelle: "Fiche", droite: true },
-              ]}
-            >
-              {donnees.map((u) => (
-                <tr key={u.id}>
-                  <td>
-                    <div className="nom-primaire">{u.nom}</div>
-                    <div className="nom-secondaire">{u.telephone}</div>
-                  </td>
-                  <td>{LIBELLE_ROLE[u.role]}</td>
-                  <td className="num droite">
-                    {u.role === "moniteur" ? fFCFA(u.tarifHoraire ?? 0) : "—"}
-                  </td>
-                  <td className="droite">
-                    {u.actif ? <Jeton ton="vert">Actif</Jeton> : <Jeton ton="rouge">Désactivé</Jeton>}
-                  </td>
-                  <td className="droite">
-                    <button type="button" className="bouton nu" onClick={() => setFiche(u)}>
-                      Ouvrir
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </Grille>
-          )}
-        </Bloc>
+      {donnees && donnees.length === 0 && (
+        <Desert glyphe="◵">Aucun collaborateur enregistré.</Desert>
+      )}
+
+      {donnees && donnees.length > 0 && (
+        <div className="fiches">
+          {donnees.map((u) => {
+            const p = (paie.donnees ?? []).find((x) => x.moniteurId === u.id);
+            const moniteur = u.role === "moniteur";
+            return (
+              <article key={u.id} className="fiche">
+                <div className="fiche-tete">
+                  <div className="identite">
+                    <div className="principal texte">{u.nom}</div>
+                    <div className="secondaire mono">{u.telephone}</div>
+                  </div>
+                  {u.actif ? (
+                    <Jeton ton={moniteur ? "vert" : "bleu"}>{LIBELLE_ROLE[u.role]}</Jeton>
+                  ) : (
+                    <Jeton ton="rouge">Désactivé</Jeton>
+                  )}
+                </div>
+
+                {moniteur ? (
+                  <div className="paires">
+                    <div>
+                      <div className="cle">Heures (semaine)</div>
+                      <div className="val">{p ? `${p.heuresSemaine} h` : "—"}</div>
+                    </div>
+                    <div>
+                      <div className="cle">Heures (mois)</div>
+                      <div className="val">{p ? `${p.heuresMois} h` : "—"}</div>
+                    </div>
+                    <div>
+                      <div className="cle">Taux horaire</div>
+                      <div className="val">{fFCFA(u.tarifHoraire ?? 0)}</div>
+                    </div>
+                    <div>
+                      <div className="cle">Élèves suivis</div>
+                      <div className="val">{p?.elevesSuivis ?? 0}</div>
+                    </div>
+                    <div>
+                      <div className="cle">Agrément</div>
+                      <div className="val">{u.permisEnseigner || "—"}</div>
+                    </div>
+                    <div>
+                      <div className="cle">Réussite</div>
+                      <div className="val">{p ? `${p.tauxReussite} %` : "—"}</div>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="faible" style={{ margin: 0 }}>
+                    {u.role === "directeur"
+                      ? "Accès complet à l'école : réglages, comptabilité et personnel."
+                      : "Gestion courante : inscriptions, encaissements et planning."}
+                  </p>
+                )}
+
+                {moniteur && (
+                  <div className="encart">
+                    <span className="cle">Paie du mois</span>
+                    <span className="val">{fFCFA(p?.paieMois ?? 0)}</span>
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  className="bouton doux large"
+                  style={{ marginTop: "auto", marginBlockStart: 12 }}
+                  onClick={() => setFiche(u)}
+                >
+                  Ouvrir la fiche
+                </button>
+              </article>
+            );
+          })}
+        </div>
       )}
 
       {creation && (

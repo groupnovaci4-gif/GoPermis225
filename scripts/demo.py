@@ -50,25 +50,42 @@ async def semer() -> None:
         }
     )
 
-    directeur_id, moniteur_id = nouvel_id(), nouvel_id()
-    for agent in (
+    directeur_id = nouvel_id()
+    moniteurs = [
+        {"id": nouvel_id(), "nom": "Yao Kouassi", "telephone": "0708080808",
+         "role": "moniteur", "tarifHoraire": 2500, "permisEnseigner": "MON-CI-4023"},
+        {"id": nouvel_id(), "nom": "Aya Bernadette", "telephone": "0709090909",
+         "role": "moniteur", "tarifHoraire": 2200, "permisEnseigner": "MON-CI-4412"},
+        {"id": nouvel_id(), "nom": "Bamba Seydou", "telephone": "0710101010",
+         "role": "moniteur", "tarifHoraire": 2800, "permisEnseigner": "MON-CI-5178"},
+    ]
+    moniteur_id = moniteurs[0]["id"]
+
+    for agent in [
         {"id": directeur_id, "nom": "M. Koffi Anzoumana", "telephone": "0701020304",
-         "role": "directeur", "tarifHoraire": 0},
-        {"id": moniteur_id, "nom": "Yao Kouassi", "telephone": "0708080808",
-         "role": "moniteur", "tarifHoraire": 2500},
-    ):
+         "role": "directeur", "tarifHoraire": 0, "permisEnseigner": ""},
+        {"id": nouvel_id(), "nom": "Adjoua Konan", "telephone": "0505050505",
+         "role": "secretaire", "tarifHoraire": 0, "permisEnseigner": ""},
+        *moniteurs,
+    ]:
         await BASE["utilisateurs"].insert_one(
-            {**agent, "ecoleId": ecole_id, "actif": True, "permisEnseigner": "",
-             "note": "", "empreinte": hacher_secret("demo1234"),
+            {**agent, "ecoleId": ecole_id, "actif": True, "note": "",
+             "empreinte": hacher_secret("demo1234"),
              "creeLe": maintenant(), "modifieLe": maintenant()}
         )
 
+    # (nom, prénoms, téléphone, frais, statut, index, heures de conduite faites)
     eleves = [
-        ("Traoré", "Awa", "0555111111", 150000, "actif", 1),
-        ("Koné", "Ibrahim", "0555222222", 150000, "actif", 2),
-        ("Bamba", "Fatou", "0555333333", 90000, "diplome", 3),
+        ("Traoré", "Awa", "0555111111", 150000, "actif", 1, 4),
+        ("Koné", "Ibrahim", "0555222222", 150000, "actif", 2, 17),
+        ("Bamba", "Fatou", "0555333333", 90000, "diplome", 3, 20),
+        ("N'Guessan", "Serge", "0555444444", 150000, "actif", 4, 18),
+        ("Diomandé", "Mariam", "0555555555", 150000, "actif", 5, 11),
+        ("Yapo", "Nadège", "0555666666", 250000, "actif", 6, 2),
+        ("Gbagbo", "Arsène", "0555777777", 150000, "suspendu", 7, 8),
+        ("Assi", "Emmanuel", "0555888888", 150000, "abandon", 8, 3),
     ]
-    for nom, prenoms, tel, montant, statut, index in eleves:
+    for nom, prenoms, tel, montant, statut, index, heures_faites in eleves:
         eleve_id = nouvel_id()
         await BASE["eleves"].insert_one(
             {
@@ -97,19 +114,34 @@ async def semer() -> None:
                 "creeLe": maintenant(), "modifieLe": maintenant(),
             }
         )
-        debut = datetime.now().replace(hour=8, minute=0, second=0, microsecond=0) \
-            + timedelta(days=index - 1)
-        await BASE["seances"].insert_one(
-            {
-                "id": nouvel_id(), "ecoleId": ecole_id, "eleveId": eleve_id,
-                "moniteurId": moniteur_id, "vehiculeId": "", "type": "conduite",
-                "debut": debut, "fin": debut + timedelta(hours=2),
-                "statut": "effectuee" if index < 3 else "planifiee",
-                "lieu": "Devant l'auto-école", "motif": "", "kilometrage": 0,
-                "creePar": directeur_id,
-                "creeLe": maintenant(), "modifieLe": maintenant(),
-            }
-        )
+        # Séances passées, marquées effectuées : elles portent la progression.
+        moniteur = moniteurs[index % len(moniteurs)]
+        base_jour = datetime.now().replace(hour=8, minute=0, second=0, microsecond=0)
+        for h in range(heures_faites):
+            debut = base_jour - timedelta(days=h + 1, hours=(index % 5))
+            await BASE["seances"].insert_one(
+                {
+                    "id": nouvel_id(), "ecoleId": ecole_id, "eleveId": eleve_id,
+                    "moniteurId": moniteur["id"], "vehiculeId": "", "type": "conduite",
+                    "debut": debut, "fin": debut + timedelta(hours=1),
+                    "statut": "effectuee", "lieu": "Devant l'auto-école",
+                    "motif": "", "kilometrage": 0, "creePar": directeur_id,
+                    "creeLe": maintenant(), "modifieLe": maintenant(),
+                }
+            )
+        # Une séance à venir cette semaine, pour peupler le planning.
+        if statut == "actif":
+            prochain = base_jour + timedelta(days=(index % 5) + 1, hours=index % 4)
+            await BASE["seances"].insert_one(
+                {
+                    "id": nouvel_id(), "ecoleId": ecole_id, "eleveId": eleve_id,
+                    "moniteurId": moniteur["id"], "vehiculeId": "", "type": "conduite",
+                    "debut": prochain, "fin": prochain + timedelta(hours=1),
+                    "statut": "planifiee", "lieu": "Rond-point de la Sicogi",
+                    "motif": "", "kilometrage": 0, "creePar": directeur_id,
+                    "creeLe": maintenant(), "modifieLe": maintenant(),
+                }
+            )
 
     # Le compteur doit refléter les reçus déjà semés, sinon le premier
     # encaissement réel repart à 000001 et entre en collision.
@@ -120,17 +152,45 @@ async def semer() -> None:
         {"ecoleId": ecole_id, "nom": "eleve", "valeur": len(eleves)}
     )
 
-    await BASE["vehicules"].insert_one(
-        {
-            "id": nouvel_id(), "ecoleId": ecole_id, "immatriculation": "1234AB01",
-            "modele": "Toyota Corolla", "annee": 2018, "categorie": "B",
-            "kilometrage": 145000, "actif": True,
-            "assuranceExpire": (date.today() + timedelta(days=12)).isoformat(),
-            "visiteTechniqueExpire": (date.today() - timedelta(days=5)).isoformat(),
-            "vignetteExpire": None, "entretiens": [],
-            "creeLe": maintenant(), "modifieLe": maintenant(),
-        }
-    )
+    flotte = [
+        ("2145CI01", "Toyota Yaris", 2018, 120000, True, 12, -5,
+         [("Vidange + filtre à huile", 45000), ("Pneus avant", 50000)]),
+        ("3782CI02", "Hyundai i10", 2020, 61200, True, 190, -28,
+         [("Plaquettes de frein avant", 68000)]),
+        ("5510CI03", "Suzuki Alto", 2021, 39800, True, 280, 225, []),
+        ("9034CI04", "Peugeot 208", 2017, 112400, False, 3, 38,
+         [("Réparation embrayage", 185000)]),
+    ]
+    for immat, modele, annee, km, actif, assurance_j, visite_j, entretiens in flotte:
+        await BASE["vehicules"].insert_one(
+            {
+                "id": nouvel_id(), "ecoleId": ecole_id, "immatriculation": immat,
+                "modele": modele, "annee": annee, "categorie": "B",
+                "kilometrage": km, "actif": actif,
+                "assuranceExpire": (date.today() + timedelta(days=assurance_j)).isoformat(),
+                "visiteTechniqueExpire": (date.today() + timedelta(days=visite_j)).isoformat(),
+                "vignetteExpire": None,
+                "entretiens": [
+                    {"date": (date.today() - timedelta(days=30 * (i + 1))).isoformat(),
+                     "nature": nature, "cout": cout, "kilometrage": km, "note": ""}
+                    for i, (nature, cout) in enumerate(entretiens)
+                ],
+                "creeLe": maintenant(), "modifieLe": maintenant(),
+            }
+        )
+
+    for categorie, montant, jours in (
+        ("Carburant", 85000, 3), ("Salaire moniteur", 240000, 8),
+        ("Entretien véhicule", 68000, 15), ("Loyer", 150000, 20),
+    ):
+        await BASE["depenses"].insert_one(
+            {
+                "id": nouvel_id(), "ecoleId": ecole_id, "categorie": categorie,
+                "montant": montant, "date": (date.today() - timedelta(days=jours)).isoformat(),
+                "vehiculeId": "", "note": "", "saisiePar": directeur_id,
+                "creeLe": maintenant(), "modifieLe": maintenant(),
+            }
+        )
     print("Données de démonstration prêtes.")
     print("  Directeur : 0701020304 / demo1234")
     print("  Moniteur  : 0708080808 / demo1234")

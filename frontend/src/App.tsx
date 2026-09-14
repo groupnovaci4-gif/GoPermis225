@@ -10,6 +10,7 @@ import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 import { useSession } from "./session";
 import Comptabilite from "./pages/Comptabilite";
+import Convocations from "./pages/Convocations";
 import Connexion from "./pages/Connexion";
 import EleveDetail from "./pages/EleveDetail";
 import Eleves from "./pages/Eleves";
@@ -67,6 +68,7 @@ export default function App() {
       <Route path="/comptabilite" element={<Comptabilite />} />
       <Route path="/planning" element={<Planning />} />
       <Route path="/flotte" element={<Flotte />} />
+      <Route path="/convocations" element={<Convocations />} />
       <Route path="/moniteurs" element={<Moniteurs />} />
       <Route path="/reglages" element={<Reglages />} />
       <Route path="*" element={<Navigate to={accueil} replace />} />
