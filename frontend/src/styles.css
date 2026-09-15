@@ -468,3 +468,60 @@ textarea { min-height: 70px; resize: vertical; }
 .bandeau-info .glyphe { color: var(--vert); font-size: 14px; line-height: 1.2; }
 .bandeau-info .titre { font-size: 12.5px; font-weight: 650; margin-bottom: 2px; }
 .bandeau-info p { font-size: 12px; color: var(--texte-doux); margin: 0; }
+
+/* ------------------------------------------------------ Emplacements photo
+
+   Les photographies sont optionnelles (voir public/images/README.md). Chaque
+   emplacement porte son dégradé de repli en fond : si l'image manque, le bloc
+   garde sa forme et la page reste correcte. */
+
+.photo {
+  position: relative; overflow: hidden;
+  border-radius: 14px; border: 1px solid var(--bordure);
+  /* Repli volontairement sombre : les légendes sont en blanc, elles doivent
+     rester lisibles que la photographie soit présente ou non. */
+  background:
+    radial-gradient(90% 70% at 20% 10%, rgba(14, 159, 79, .34), transparent 65%),
+    linear-gradient(160deg, #10281b 0%, #0d1117 100%);
+}
+.photo > img { position: absolute; inset: 0; }
+
+/* Légende posée sur la photo, lisible quelle que soit l'image. */
+.photo .legende {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 2;
+  padding: 18px 20px; color: #fff;
+  background: linear-gradient(to top, rgba(8, 20, 14, .88), rgba(8, 20, 14, 0));
+}
+.photo .legende .sur-titre { color: rgba(255, 255, 255, .7); }
+.photo .legende p { margin: 6px 0 0; font-size: 14px; line-height: 1.4; }
+.photo .legende .signature { font-size: 11.5px; color: rgba(255, 255, 255, .65); margin-top: 8px; }
+
+/* La carte de chiffres flottant sur l'image d'accueil. */
+.photo-encart {
+  position: absolute; left: 16px; bottom: 16px; z-index: 3;
+  background: var(--surface); border: 1px solid var(--bordure);
+  border-radius: var(--rayon); box-shadow: 0 6px 20px rgba(16, 24, 40, .16);
+  padding: 12px 14px; max-width: 220px;
+}
+
+/* Panneau gauche de la connexion : la photo passe derrière le dégradé. */
+.scinde-gauche { position: relative; isolation: isolate; }
+.scinde-gauche > img {
+  position: absolute; inset: 0; z-index: -2;
+}
+.scinde-gauche::after {
+  /* Voile dégradé : sombre en bas, là où se trouve le texte, presque
+     transparent en haut pour laisser voir la photographie. Un voile uniforme
+     assez opaque pour le texte effacerait complètement l'image. */
+  content: ""; position: absolute; inset: 0; z-index: -1;
+  background:
+    linear-gradient(to top,
+      rgba(8, 20, 14, .94) 0%,
+      rgba(8, 20, 14, .72) 38%,
+      rgba(8, 20, 14, .30) 100%),
+    linear-gradient(150deg, rgba(14, 159, 79, .18), rgba(13, 17, 23, .25));
+}
+
+.temoignage { display: grid; gap: 12px; grid-template-columns: 1fr; }
+@media (min-width: 900px) { .temoignage { grid-template-columns: 1.4fr 1fr; } }
+.temoignage-cote { display: grid; gap: 12px; align-content: start; }

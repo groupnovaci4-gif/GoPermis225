@@ -185,9 +185,11 @@ Conventions d'écriture :
   une boîte modale centrée : la liste reste visible derrière ;
 - les listes passent par `<Grille>` ; les cartes de chiffres par
   `<Indicateur>` ; les blocs par `<Bloc>` ;
-- aucune photographie n'est embarquée. Les visuels sont construits en CSS —
-  une image de banque d'images poserait une question de droits que
-  l'auto-école n'a pas à hériter ;
+- les photographies vivent dans `frontend/public/images/` et sont
+  **optionnelles**. Chaque emplacement porte un dégradé de repli sombre, et
+  `<Illustration>` se retire si le fichier est absent : la page reste correcte
+  avec ou sans photo. Ne jamais embarquer d'image dont on ne connaît pas la
+  licence — voir `public/images/README.md` ;
 - un document protégé se télécharge par `telecharger()` de `api.ts`, jamais par
   un `<a href>` : un lien n'emporte pas l'en-tête `Authorization` et recevrait
   un 401.

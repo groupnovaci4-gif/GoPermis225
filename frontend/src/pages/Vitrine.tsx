@@ -8,6 +8,8 @@
 
 import { Link } from "react-router-dom";
 
+import { Illustration } from "../components/Illustration";
+
 const ATOUTS = [
   {
     glyphe: "◲",
@@ -96,8 +98,50 @@ export default function Vitrine() {
             </div>
           </div>
 
-          <div className="visuel">
-            <ApercuTableau />
+          <div className="photo" style={{ minHeight: 330 }}>
+            <Illustration nom="heros.jpg" alt="Une élève au volant, à Abidjan" />
+            <div className="photo-encart">
+              <div className="sur-titre">Ce mois-ci</div>
+              <div className="mono" style={{ fontSize: 21, fontWeight: 650, color: "var(--vert)" }}>
+                1 245 000
+              </div>
+              <div className="faible">FCFA encaissés · 12 élèves actifs</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div className="dedans" style={{ display: "grid", gap: 14, gridTemplateColumns: "1fr" }}>
+          <div className="temoignage">
+            <div className="photo" style={{ minHeight: 300 }}>
+              <Illustration nom="conduite.jpg" alt="Une leçon de conduite" position="center 40%" />
+              <div className="legende">
+                <div className="sur-titre">Du premier cours au permis</div>
+                <p>
+                  « J'ai eu mon permis en 6 semaines. Mon auto-école suivait mes
+                  heures et mes paiements sur son téléphone. »
+                </p>
+                <div className="signature">Kouadio B. — Yopougon, Abidjan</div>
+              </div>
+            </div>
+            <div className="temoignage-cote">
+              <div className="carte" style={{ background: "var(--vert-pale)", borderColor: "transparent" }}>
+                <p style={{ margin: 0, fontSize: 13 }}>
+                  Conçu pour les réalités locales : paiements mobiles Wave, Orange
+                  Money et MTN, relances par WhatsApp, convocations CGI et communes
+                  d'Abidjan.
+                </p>
+              </div>
+              <div className="photo" style={{ minHeight: 190 }}>
+                <Illustration nom="ville.jpg" alt="Circulation à Abidjan" />
+                <div className="legende">
+                  <p style={{ fontSize: 12.5 }}>
+                    Formez des conducteurs prêts pour le trafic d'Abidjan.
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -157,46 +201,6 @@ export default function Vitrine() {
           <Link to="/connexion">Accéder à mon espace</Link>
         </div>
       </footer>
-    </div>
-  );
-}
-
-/** Aperçu schématique de l'interface — dessiné, jamais une capture réelle. */
-function ApercuTableau() {
-  const lignes = [
-    { nom: "Aminata Touré", statut: "En formation", pct: 70, solde: "140 000" },
-    { nom: "Serge N'Guessan", statut: "Prêt examen", pct: 90, solde: "0" },
-    { nom: "Rokia Sangaré", statut: "Inscrit", pct: 8, solde: "200 000" },
-  ];
-  return (
-    <div style={{ width: "100%", maxWidth: 430 }} aria-hidden="true">
-      <div className="bloc" style={{ padding: 13 }}>
-        <div className="sur-titre">Ce mois-ci</div>
-        <div className="mono" style={{ fontSize: 26, fontWeight: 650, color: "var(--vert)" }}>
-          1 245 000
-        </div>
-        <div className="faible">FCFA encaissés · 12 élèves actifs</div>
-
-        <div style={{ marginTop: 14 }}>
-          {lignes.map((l) => (
-            <div
-              key={l.nom}
-              className="ligne-flex"
-              style={{ padding: "7px 0", borderTop: "1px solid var(--bordure)" }}
-            >
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 12, fontWeight: 600 }}>{l.nom}</div>
-                <div className="barre" style={{ marginTop: 4 }}>
-                  <span style={{ width: `${l.pct}%` }} />
-                </div>
-              </div>
-              <div className="mono faible" style={{ width: 78, textAlign: "right" }}>
-                {l.solde}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
     </div>
   );
 }

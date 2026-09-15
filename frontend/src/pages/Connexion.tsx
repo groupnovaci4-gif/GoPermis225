@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
+import { Illustration } from "../components/Illustration";
 import { Avis, Champ } from "../components/ui";
 import { useEnvoi } from "../hooks";
 import { useSession } from "../session";
@@ -36,6 +37,11 @@ export default function Connexion() {
   return (
     <div className="scinde">
       <div className="scinde-gauche">
+        <Illustration
+          nom="connexion.jpg"
+          alt="Une élève consulte son suivi de formation sur son téléphone"
+          position="center 30%"
+        />
         <div className="sur-titre" style={{ color: "rgba(255,255,255,.55)" }}>
           Espace de gestion
         </div>

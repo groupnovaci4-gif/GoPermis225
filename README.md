@@ -133,6 +133,16 @@ manque le compte WhatsApp Business), le paiement en ligne Orange Money / Wave,
 l'attestation de fin de formation et la fiche de paie en PDF, le multi-agences.
 Voir `CLAUDE.md`.
 
+## Photographies
+
+Déposez vos images dans `frontend/public/images/` puis relancez `yarn build` :
+`heros.jpg`, `conduite.jpg`, `ville.jpg` (vitrine) et `connexion.jpg` (page de
+connexion, cadrage portrait). Elles apparaissent sans modification de code.
+
+Les emplacements fonctionnent sans elles : un dégradé de repli occupe la place
+et la page reste correcte. Détails et formats conseillés dans
+`frontend/public/images/README.md`.
+
 ## Sécurité
 
 Les garde-fous de l'interface sont cosmétiques : n'importe qui peut appeler
